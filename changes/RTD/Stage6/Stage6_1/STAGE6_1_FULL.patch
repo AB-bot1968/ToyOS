@@ -1,0 +1,1524 @@
+diff -urN /tmp/toyos6base/DESIGN.md /tmp/toyos6/DESIGN.md
+--- /tmp/toyos6base/DESIGN.md	2026-09-15 15:30:21.000000000 +0000
++++ /tmp/toyos6/DESIGN.md	2026-09-18 14:17:24.316877942 +0000
+@@ -203,3 +203,8 @@
+ `SYS_GETCWD=30` безопасно возвращает его Ring-3 shell. Благодаря тому, что существующие
+ `fat_lookup_path()` и `fat_resolve_parent()` используют один нормализатор, относительные
+ пути автоматически распространяются на файловые операции и загрузчик EXE1.
++
++
++## v67 RTD Stage 6.1 — dual-rate time base
++
++The PIT is programmed at 100 Hz for the RT scheduler. A separate logical 50 Hz counter preserves the existing `SYS_TIMER_GET` contract. `rt_time_ticks` is the only clock used by detached RT release/deadline/budget calculations. The legacy EXECMT scheduler is still dispatched at the 50 Hz logical cadence. `SYS_RT_TIME_GET=45` exposes the 10 ms RT counter to Ring-3 diagnostics without changing existing syscall numbers.
+diff -urN /tmp/toyos6base/README.md /tmp/toyos6/README.md
+--- /tmp/toyos6base/README.md	2026-09-18 13:57:55.000000000 +0000
++++ /tmp/toyos6/README.md	2026-09-18 14:20:14.891197122 +0000
+@@ -831,3 +831,12 @@
+ Программа намеренно работает несколько PIT-tick перед `SYS_RT_WAIT`. Для `period=20 ms` это позволяет увидеть несколько пропущенных release. После `SYS_RT_WAIT` строка `next-job` должна показывать новый `release`, находящийся в будущем относительно момента завершения, а `skipped` — количество пропущенных номинальных активаций.
+ 
+ Подробности: `changes/RTD/Stage5/Stage5_3/`.
++
++
++## v67 RTD Stage 6.1 — отдельный RT timebase 100 Hz
++
++Stage 6.1 adds a real 10 ms RT timebase without changing the logical 50 Hz system timer exposed by `SYS_TIMER_GET`. The PIT hardware is programmed for 100 Hz; `rt_time_ticks` advances on every IRQ0, while the legacy `timer_ticks` advances on every second interrupt and therefore remains 50 Hz. The existing EXECMT scheduler continues to run on the logical 50 Hz cadence, while the detached RT scheduler is serviced at every 10 ms interrupt. RT `period/deadline/release` conversions now use the 100 Hz RT clock, so `10 ms` is exactly one RT tick, `20 ms` is two RT ticks, `40 ms` is four RT ticks, and `100 ms` is ten RT ticks. `SYS_RT_TIME_GET=45` exposes the RT clock to Ring 3; `SYS_TIMER_GET=3` remains the legacy 50 Hz system clock.
++
++The ordinary EXE1 diagnostic `RTTIME.EXE` compares both counters. Example: `exec RTD.EXE RTTIME.EXE 1000 1000 255`, then `F10`. It reports one RT tick per hardware interval and approximately one legacy system tick per two RT ticks.
++
++Подробности Stage 6.1: `changes/RTD/Stage6/Stage6_1/`.
+diff -urN /tmp/toyos6base/build/AUTOSTART.SH /tmp/toyos6/build/AUTOSTART.SH
+--- /tmp/toyos6base/build/AUTOSTART.SH	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/build/AUTOSTART.SH	2026-09-18 14:20:38.797825608 +0000
+@@ -0,0 +1 @@
++exec VGADRV.EXE SPLASH.RAW
+Binary files /tmp/toyos6base/build/COMDRV.EXE and /tmp/toyos6/build/COMDRV.EXE differ
+Binary files /tmp/toyos6base/build/DEADLINE.EXE and /tmp/toyos6/build/DEADLINE.EXE differ
+Binary files /tmp/toyos6base/build/HELLO.EXE and /tmp/toyos6/build/HELLO.EXE differ
+Binary files /tmp/toyos6base/build/LOADER.EXE and /tmp/toyos6/build/LOADER.EXE differ
+Binary files /tmp/toyos6base/build/MT01.EXE and /tmp/toyos6/build/MT01.EXE differ
+Binary files /tmp/toyos6base/build/MT02.EXE and /tmp/toyos6/build/MT02.EXE differ
+Binary files /tmp/toyos6base/build/MT03.EXE and /tmp/toyos6/build/MT03.EXE differ
+Binary files /tmp/toyos6base/build/MT04.EXE and /tmp/toyos6/build/MT04.EXE differ
+Binary files /tmp/toyos6base/build/MT05.EXE and /tmp/toyos6/build/MT05.EXE differ
+Binary files /tmp/toyos6base/build/MT06.EXE and /tmp/toyos6/build/MT06.EXE differ
+Binary files /tmp/toyos6base/build/MT07.EXE and /tmp/toyos6/build/MT07.EXE differ
+Binary files /tmp/toyos6base/build/MT08.EXE and /tmp/toyos6/build/MT08.EXE differ
+Binary files /tmp/toyos6base/build/MT09.EXE and /tmp/toyos6/build/MT09.EXE differ
+Binary files /tmp/toyos6base/build/MT10.EXE and /tmp/toyos6/build/MT10.EXE differ
+Binary files /tmp/toyos6base/build/MT11.EXE and /tmp/toyos6/build/MT11.EXE differ
+Binary files /tmp/toyos6base/build/MT12.EXE and /tmp/toyos6/build/MT12.EXE differ
+Binary files /tmp/toyos6base/build/MT13.EXE and /tmp/toyos6/build/MT13.EXE differ
+Binary files /tmp/toyos6base/build/MT14.EXE and /tmp/toyos6/build/MT14.EXE differ
+Binary files /tmp/toyos6base/build/MT15.EXE and /tmp/toyos6/build/MT15.EXE differ
+Binary files /tmp/toyos6base/build/MT16.EXE and /tmp/toyos6/build/MT16.EXE differ
+Binary files /tmp/toyos6base/build/MT17.EXE and /tmp/toyos6/build/MT17.EXE differ
+Binary files /tmp/toyos6base/build/MT18.EXE and /tmp/toyos6/build/MT18.EXE differ
+Binary files /tmp/toyos6base/build/MT19.EXE and /tmp/toyos6/build/MT19.EXE differ
+Binary files /tmp/toyos6base/build/MT20.EXE and /tmp/toyos6/build/MT20.EXE differ
+Binary files /tmp/toyos6base/build/MT21.EXE and /tmp/toyos6/build/MT21.EXE differ
+Binary files /tmp/toyos6base/build/MT22.EXE and /tmp/toyos6/build/MT22.EXE differ
+Binary files /tmp/toyos6base/build/MT23.EXE and /tmp/toyos6/build/MT23.EXE differ
+Binary files /tmp/toyos6base/build/MT24.EXE and /tmp/toyos6/build/MT24.EXE differ
+Binary files /tmp/toyos6base/build/MT25.EXE and /tmp/toyos6/build/MT25.EXE differ
+diff -urN /tmp/toyos6base/build/NET.CFG /tmp/toyos6/build/NET.CFG
+--- /tmp/toyos6base/build/NET.CFG	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/build/NET.CFG	2026-09-18 14:20:34.218460283 +0000
+@@ -0,0 +1,10 @@
++# NETDRV.EXE v58 — конфигурация QEMU user-mode networking + NE2000 ISA
++# Все значения ASCII. Пустые строки и строки с # игнорируются.
++BASE=300
++MAC=52:54:00:12:34:56
++IP=10.0.2.15
++MASK=255.255.255.0
++GATEWAY=10.0.2.2
++PORT=8080
++PATH=/
++TIMEOUT=10
+Binary files /tmp/toyos6base/build/NETDRV.EXE and /tmp/toyos6/build/NETDRV.EXE differ
+diff -urN /tmp/toyos6base/build/NET_MAST.CFG /tmp/toyos6/build/NET_MAST.CFG
+--- /tmp/toyos6base/build/NET_MAST.CFG	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/build/NET_MAST.CFG	2026-09-18 14:20:34.219813669 +0000
+@@ -0,0 +1,11 @@
++# Toy OS v66.3 — MASTER для маршрутизируемой Wi-Fi сети без L2 bridge.
++# Виртуальная подсеть ПК №1: 10.66.1.0/24.
++# 10.66.1.1 — IP Windows на TAP tap0; 10.66.1.2 — Toy OS Master.
++BASE=300
++MAC=52:54:00:10:66:10
++IP=10.66.1.2
++MASK=255.255.255.0
++GATEWAY=10.66.1.1
++PORT=8080
++PATH=/
++TIMEOUT=10
+diff -urN /tmp/toyos6base/build/NET_SLV1.CFG /tmp/toyos6/build/NET_SLV1.CFG
+--- /tmp/toyos6base/build/NET_SLV1.CFG	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/build/NET_SLV1.CFG	2026-09-18 14:20:34.221101161 +0000
+@@ -0,0 +1,11 @@
++# Toy OS v66.3 — SLAVE1 для маршрутизируемой Wi-Fi сети без L2 bridge.
++# Виртуальная подсеть ПК №2: 10.66.2.0/24.
++# 10.66.2.1 — IP Windows на TAP tap0; 10.66.2.2 — Toy OS Slave1.
++BASE=300
++MAC=52:54:00:10:66:11
++IP=10.66.2.2
++MASK=255.255.255.0
++GATEWAY=10.66.2.1
++PORT=8080
++PATH=/
++TIMEOUT=10
+diff -urN /tmp/toyos6base/build/NET_SLV2.CFG /tmp/toyos6/build/NET_SLV2.CFG
+--- /tmp/toyos6base/build/NET_SLV2.CFG	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/build/NET_SLV2.CFG	2026-09-18 14:20:34.222434679 +0000
+@@ -0,0 +1,11 @@
++# Toy OS v66.3 — SLAVE2 для маршрутизируемой Wi-Fi сети без L2 bridge.
++# Виртуальная подсеть ПК №2: 10.66.2.0/24.
++# 10.66.2.1 — IP Windows на TAP tap0; 10.66.2.3 — Toy OS Slave2.
++BASE=300
++MAC=52:54:00:10:66:12
++IP=10.66.2.3
++MASK=255.255.255.0
++GATEWAY=10.66.2.1
++PORT=8080
++PATH=/
++TIMEOUT=10
+Binary files /tmp/toyos6base/build/QFILE.EXE and /tmp/toyos6/build/QFILE.EXE differ
+Binary files /tmp/toyos6base/build/QFROMEXE.EXE and /tmp/toyos6/build/QFROMEXE.EXE differ
+Binary files /tmp/toyos6base/build/QNESTED.EXE and /tmp/toyos6/build/QNESTED.EXE differ
+Binary files /tmp/toyos6base/build/QPASS.EXE and /tmp/toyos6/build/QPASS.EXE differ
+Binary files /tmp/toyos6base/build/QPORT.EXE and /tmp/toyos6/build/QPORT.EXE differ
+Binary files /tmp/toyos6base/build/QSIZE.EXE and /tmp/toyos6/build/QSIZE.EXE differ
+Binary files /tmp/toyos6base/build/QSTOP.EXE and /tmp/toyos6/build/QSTOP.EXE differ
+Binary files /tmp/toyos6base/build/RTD.EXE and /tmp/toyos6/build/RTD.EXE differ
+Binary files /tmp/toyos6base/build/RTDMISS.EXE and /tmp/toyos6/build/RTDMISS.EXE differ
+Binary files /tmp/toyos6base/build/RTDSKIP.EXE and /tmp/toyos6/build/RTDSKIP.EXE differ
+Binary files /tmp/toyos6base/build/RTTIME.EXE and /tmp/toyos6/build/RTTIME.EXE differ
+Binary files /tmp/toyos6base/build/SENSOR.EXE and /tmp/toyos6/build/SENSOR.EXE differ
+Binary files /tmp/toyos6base/build/SENSOR1.EXE and /tmp/toyos6/build/SENSOR1.EXE differ
+Binary files /tmp/toyos6base/build/SENSOR2.EXE and /tmp/toyos6/build/SENSOR2.EXE differ
+Binary files /tmp/toyos6base/build/SPLASH.RAW and /tmp/toyos6/build/SPLASH.RAW differ
+Binary files /tmp/toyos6base/build/VGADRV.EXE and /tmp/toyos6/build/VGADRV.EXE differ
+Binary files /tmp/toyos6base/build/boot.bin and /tmp/toyos6/build/boot.bin differ
+Binary files /tmp/toyos6base/build/boot.o and /tmp/toyos6/build/boot.o differ
+Binary files /tmp/toyos6base/build/boot.pe and /tmp/toyos6/build/boot.pe differ
+Binary files /tmp/toyos6base/build/comdrv.o and /tmp/toyos6/build/comdrv.o differ
+Binary files /tmp/toyos6base/build/comdrv.pe and /tmp/toyos6/build/comdrv.pe differ
+Binary files /tmp/toyos6base/build/comdrv.raw and /tmp/toyos6/build/comdrv.raw differ
+Binary files /tmp/toyos6base/build/disk.img and /tmp/toyos6/build/disk.img differ
+Binary files /tmp/toyos6base/build/fat16check.exe and /tmp/toyos6/build/fat16check.exe differ
+Binary files /tmp/toyos6base/build/hello.o and /tmp/toyos6/build/hello.o differ
+Binary files /tmp/toyos6base/build/hello.pe and /tmp/toyos6/build/hello.pe differ
+Binary files /tmp/toyos6base/build/hello.raw and /tmp/toyos6/build/hello.raw differ
+Binary files /tmp/toyos6base/build/isr.o and /tmp/toyos6/build/isr.o differ
+Binary files /tmp/toyos6base/build/kernel.bin and /tmp/toyos6/build/kernel.bin differ
+Binary files /tmp/toyos6base/build/kernel.coff.o and /tmp/toyos6/build/kernel.coff.o differ
+Binary files /tmp/toyos6base/build/kernel.o and /tmp/toyos6/build/kernel.o differ
+Binary files /tmp/toyos6base/build/kernel.pe and /tmp/toyos6/build/kernel.pe differ
+Binary files /tmp/toyos6base/build/loader.o and /tmp/toyos6/build/loader.o differ
+Binary files /tmp/toyos6base/build/loader.pe and /tmp/toyos6/build/loader.pe differ
+Binary files /tmp/toyos6base/build/loader.raw and /tmp/toyos6/build/loader.raw differ
+Binary files /tmp/toyos6base/build/mkexe.exe and /tmp/toyos6/build/mkexe.exe differ
+Binary files /tmp/toyos6base/build/mkfat16.exe and /tmp/toyos6/build/mkfat16.exe differ
+Binary files /tmp/toyos6base/build/mt01.o and /tmp/toyos6/build/mt01.o differ
+Binary files /tmp/toyos6base/build/mt01.pe and /tmp/toyos6/build/mt01.pe differ
+Binary files /tmp/toyos6base/build/mt01.raw and /tmp/toyos6/build/mt01.raw differ
+Binary files /tmp/toyos6base/build/mt02.o and /tmp/toyos6/build/mt02.o differ
+Binary files /tmp/toyos6base/build/mt02.pe and /tmp/toyos6/build/mt02.pe differ
+Binary files /tmp/toyos6base/build/mt02.raw and /tmp/toyos6/build/mt02.raw differ
+Binary files /tmp/toyos6base/build/mt03.o and /tmp/toyos6/build/mt03.o differ
+Binary files /tmp/toyos6base/build/mt03.pe and /tmp/toyos6/build/mt03.pe differ
+Binary files /tmp/toyos6base/build/mt03.raw and /tmp/toyos6/build/mt03.raw differ
+Binary files /tmp/toyos6base/build/mt04.o and /tmp/toyos6/build/mt04.o differ
+Binary files /tmp/toyos6base/build/mt04.pe and /tmp/toyos6/build/mt04.pe differ
+Binary files /tmp/toyos6base/build/mt04.raw and /tmp/toyos6/build/mt04.raw differ
+Binary files /tmp/toyos6base/build/mt05.o and /tmp/toyos6/build/mt05.o differ
+Binary files /tmp/toyos6base/build/mt05.pe and /tmp/toyos6/build/mt05.pe differ
+Binary files /tmp/toyos6base/build/mt05.raw and /tmp/toyos6/build/mt05.raw differ
+Binary files /tmp/toyos6base/build/mt06.o and /tmp/toyos6/build/mt06.o differ
+Binary files /tmp/toyos6base/build/mt06.pe and /tmp/toyos6/build/mt06.pe differ
+Binary files /tmp/toyos6base/build/mt06.raw and /tmp/toyos6/build/mt06.raw differ
+Binary files /tmp/toyos6base/build/mt07.o and /tmp/toyos6/build/mt07.o differ
+Binary files /tmp/toyos6base/build/mt07.pe and /tmp/toyos6/build/mt07.pe differ
+Binary files /tmp/toyos6base/build/mt07.raw and /tmp/toyos6/build/mt07.raw differ
+Binary files /tmp/toyos6base/build/mt08.o and /tmp/toyos6/build/mt08.o differ
+Binary files /tmp/toyos6base/build/mt08.pe and /tmp/toyos6/build/mt08.pe differ
+Binary files /tmp/toyos6base/build/mt08.raw and /tmp/toyos6/build/mt08.raw differ
+Binary files /tmp/toyos6base/build/mt09.o and /tmp/toyos6/build/mt09.o differ
+Binary files /tmp/toyos6base/build/mt09.pe and /tmp/toyos6/build/mt09.pe differ
+Binary files /tmp/toyos6base/build/mt09.raw and /tmp/toyos6/build/mt09.raw differ
+Binary files /tmp/toyos6base/build/mt10.o and /tmp/toyos6/build/mt10.o differ
+Binary files /tmp/toyos6base/build/mt10.pe and /tmp/toyos6/build/mt10.pe differ
+Binary files /tmp/toyos6base/build/mt10.raw and /tmp/toyos6/build/mt10.raw differ
+Binary files /tmp/toyos6base/build/mt11.o and /tmp/toyos6/build/mt11.o differ
+Binary files /tmp/toyos6base/build/mt11.pe and /tmp/toyos6/build/mt11.pe differ
+Binary files /tmp/toyos6base/build/mt11.raw and /tmp/toyos6/build/mt11.raw differ
+Binary files /tmp/toyos6base/build/mt12.o and /tmp/toyos6/build/mt12.o differ
+Binary files /tmp/toyos6base/build/mt12.pe and /tmp/toyos6/build/mt12.pe differ
+Binary files /tmp/toyos6base/build/mt12.raw and /tmp/toyos6/build/mt12.raw differ
+Binary files /tmp/toyos6base/build/mt13.o and /tmp/toyos6/build/mt13.o differ
+Binary files /tmp/toyos6base/build/mt13.pe and /tmp/toyos6/build/mt13.pe differ
+Binary files /tmp/toyos6base/build/mt13.raw and /tmp/toyos6/build/mt13.raw differ
+Binary files /tmp/toyos6base/build/mt14.o and /tmp/toyos6/build/mt14.o differ
+Binary files /tmp/toyos6base/build/mt14.pe and /tmp/toyos6/build/mt14.pe differ
+Binary files /tmp/toyos6base/build/mt14.raw and /tmp/toyos6/build/mt14.raw differ
+Binary files /tmp/toyos6base/build/mt15.o and /tmp/toyos6/build/mt15.o differ
+Binary files /tmp/toyos6base/build/mt15.pe and /tmp/toyos6/build/mt15.pe differ
+Binary files /tmp/toyos6base/build/mt15.raw and /tmp/toyos6/build/mt15.raw differ
+Binary files /tmp/toyos6base/build/mt16.o and /tmp/toyos6/build/mt16.o differ
+Binary files /tmp/toyos6base/build/mt16.pe and /tmp/toyos6/build/mt16.pe differ
+Binary files /tmp/toyos6base/build/mt16.raw and /tmp/toyos6/build/mt16.raw differ
+Binary files /tmp/toyos6base/build/mt17.o and /tmp/toyos6/build/mt17.o differ
+Binary files /tmp/toyos6base/build/mt17.pe and /tmp/toyos6/build/mt17.pe differ
+Binary files /tmp/toyos6base/build/mt17.raw and /tmp/toyos6/build/mt17.raw differ
+Binary files /tmp/toyos6base/build/mt18.o and /tmp/toyos6/build/mt18.o differ
+Binary files /tmp/toyos6base/build/mt18.pe and /tmp/toyos6/build/mt18.pe differ
+Binary files /tmp/toyos6base/build/mt18.raw and /tmp/toyos6/build/mt18.raw differ
+Binary files /tmp/toyos6base/build/mt19.o and /tmp/toyos6/build/mt19.o differ
+Binary files /tmp/toyos6base/build/mt19.pe and /tmp/toyos6/build/mt19.pe differ
+Binary files /tmp/toyos6base/build/mt19.raw and /tmp/toyos6/build/mt19.raw differ
+Binary files /tmp/toyos6base/build/mt20.o and /tmp/toyos6/build/mt20.o differ
+Binary files /tmp/toyos6base/build/mt20.pe and /tmp/toyos6/build/mt20.pe differ
+Binary files /tmp/toyos6base/build/mt20.raw and /tmp/toyos6/build/mt20.raw differ
+Binary files /tmp/toyos6base/build/mt21.o and /tmp/toyos6/build/mt21.o differ
+Binary files /tmp/toyos6base/build/mt21.pe and /tmp/toyos6/build/mt21.pe differ
+Binary files /tmp/toyos6base/build/mt21.raw and /tmp/toyos6/build/mt21.raw differ
+Binary files /tmp/toyos6base/build/mt22.o and /tmp/toyos6/build/mt22.o differ
+Binary files /tmp/toyos6base/build/mt22.pe and /tmp/toyos6/build/mt22.pe differ
+Binary files /tmp/toyos6base/build/mt22.raw and /tmp/toyos6/build/mt22.raw differ
+Binary files /tmp/toyos6base/build/mt23.o and /tmp/toyos6/build/mt23.o differ
+Binary files /tmp/toyos6base/build/mt23.pe and /tmp/toyos6/build/mt23.pe differ
+Binary files /tmp/toyos6base/build/mt23.raw and /tmp/toyos6/build/mt23.raw differ
+Binary files /tmp/toyos6base/build/mt24.o and /tmp/toyos6/build/mt24.o differ
+Binary files /tmp/toyos6base/build/mt24.pe and /tmp/toyos6/build/mt24.pe differ
+Binary files /tmp/toyos6base/build/mt24.raw and /tmp/toyos6/build/mt24.raw differ
+Binary files /tmp/toyos6base/build/mt25.o and /tmp/toyos6/build/mt25.o differ
+Binary files /tmp/toyos6base/build/mt25.pe and /tmp/toyos6/build/mt25.pe differ
+Binary files /tmp/toyos6base/build/mt25.raw and /tmp/toyos6/build/mt25.raw differ
+Binary files /tmp/toyos6base/build/netdrv.o and /tmp/toyos6/build/netdrv.o differ
+Binary files /tmp/toyos6base/build/netdrv.pe and /tmp/toyos6/build/netdrv.pe differ
+Binary files /tmp/toyos6base/build/netdrv.raw and /tmp/toyos6/build/netdrv.raw differ
+Binary files /tmp/toyos6base/build/path.o and /tmp/toyos6/build/path.o differ
+Binary files /tmp/toyos6base/build/pathcheck.exe and /tmp/toyos6/build/pathcheck.exe differ
+Binary files /tmp/toyos6base/build/png2raw.exe and /tmp/toyos6/build/png2raw.exe differ
+Binary files /tmp/toyos6base/build/qfile.o and /tmp/toyos6/build/qfile.o differ
+Binary files /tmp/toyos6base/build/qfile.pe and /tmp/toyos6/build/qfile.pe differ
+Binary files /tmp/toyos6base/build/qfile.raw and /tmp/toyos6/build/qfile.raw differ
+Binary files /tmp/toyos6base/build/qfromexe.o and /tmp/toyos6/build/qfromexe.o differ
+Binary files /tmp/toyos6base/build/qfromexe.pe and /tmp/toyos6/build/qfromexe.pe differ
+Binary files /tmp/toyos6base/build/qfromexe.raw and /tmp/toyos6/build/qfromexe.raw differ
+Binary files /tmp/toyos6base/build/qnested.o and /tmp/toyos6/build/qnested.o differ
+Binary files /tmp/toyos6base/build/qnested.pe and /tmp/toyos6/build/qnested.pe differ
+Binary files /tmp/toyos6base/build/qnested.raw and /tmp/toyos6/build/qnested.raw differ
+Binary files /tmp/toyos6base/build/qpass.o and /tmp/toyos6/build/qpass.o differ
+Binary files /tmp/toyos6base/build/qpass.pe and /tmp/toyos6/build/qpass.pe differ
+Binary files /tmp/toyos6base/build/qpass.raw and /tmp/toyos6/build/qpass.raw differ
+Binary files /tmp/toyos6base/build/qport.o and /tmp/toyos6/build/qport.o differ
+Binary files /tmp/toyos6base/build/qport.pe and /tmp/toyos6/build/qport.pe differ
+Binary files /tmp/toyos6base/build/qport.raw and /tmp/toyos6/build/qport.raw differ
+Binary files /tmp/toyos6base/build/qsize.o and /tmp/toyos6/build/qsize.o differ
+Binary files /tmp/toyos6base/build/qsize.pe and /tmp/toyos6/build/qsize.pe differ
+Binary files /tmp/toyos6base/build/qsize.raw and /tmp/toyos6/build/qsize.raw differ
+Binary files /tmp/toyos6base/build/qstop.o and /tmp/toyos6/build/qstop.o differ
+Binary files /tmp/toyos6base/build/qstop.pe and /tmp/toyos6/build/qstop.pe differ
+Binary files /tmp/toyos6base/build/qstop.raw and /tmp/toyos6/build/qstop.raw differ
+Binary files /tmp/toyos6base/build/rt_deadline_diag.o and /tmp/toyos6/build/rt_deadline_diag.o differ
+Binary files /tmp/toyos6base/build/rt_deadline_diag.pe and /tmp/toyos6/build/rt_deadline_diag.pe differ
+Binary files /tmp/toyos6base/build/rt_deadline_diag.raw and /tmp/toyos6/build/rt_deadline_diag.raw differ
+Binary files /tmp/toyos6base/build/rt_deadline_miss_diag.o and /tmp/toyos6/build/rt_deadline_miss_diag.o differ
+Binary files /tmp/toyos6base/build/rt_deadline_miss_diag.pe and /tmp/toyos6/build/rt_deadline_miss_diag.pe differ
+Binary files /tmp/toyos6base/build/rt_deadline_miss_diag.raw and /tmp/toyos6/build/rt_deadline_miss_diag.raw differ
+Binary files /tmp/toyos6base/build/rt_period_skip_diag.o and /tmp/toyos6/build/rt_period_skip_diag.o differ
+Binary files /tmp/toyos6base/build/rt_period_skip_diag.pe and /tmp/toyos6/build/rt_period_skip_diag.pe differ
+Binary files /tmp/toyos6base/build/rt_period_skip_diag.raw and /tmp/toyos6/build/rt_period_skip_diag.raw differ
+Binary files /tmp/toyos6base/build/rt_sensor.o and /tmp/toyos6/build/rt_sensor.o differ
+Binary files /tmp/toyos6base/build/rt_sensor.pe and /tmp/toyos6/build/rt_sensor.pe differ
+Binary files /tmp/toyos6base/build/rt_sensor.raw and /tmp/toyos6/build/rt_sensor.raw differ
+Binary files /tmp/toyos6base/build/rt_sensor1.o and /tmp/toyos6/build/rt_sensor1.o differ
+Binary files /tmp/toyos6base/build/rt_sensor1.pe and /tmp/toyos6/build/rt_sensor1.pe differ
+Binary files /tmp/toyos6base/build/rt_sensor1.raw and /tmp/toyos6/build/rt_sensor1.raw differ
+Binary files /tmp/toyos6base/build/rt_sensor2.o and /tmp/toyos6/build/rt_sensor2.o differ
+Binary files /tmp/toyos6base/build/rt_sensor2.pe and /tmp/toyos6/build/rt_sensor2.pe differ
+Binary files /tmp/toyos6base/build/rt_sensor2.raw and /tmp/toyos6/build/rt_sensor2.raw differ
+Binary files /tmp/toyos6base/build/rt_timebase_diag.o and /tmp/toyos6/build/rt_timebase_diag.o differ
+Binary files /tmp/toyos6base/build/rt_timebase_diag.pe and /tmp/toyos6/build/rt_timebase_diag.pe differ
+Binary files /tmp/toyos6base/build/rt_timebase_diag.raw and /tmp/toyos6/build/rt_timebase_diag.raw differ
+Binary files /tmp/toyos6base/build/rtd.o and /tmp/toyos6/build/rtd.o differ
+Binary files /tmp/toyos6base/build/rtd.pe and /tmp/toyos6/build/rtd.pe differ
+Binary files /tmp/toyos6base/build/rtd.raw and /tmp/toyos6/build/rtd.raw differ
+Binary files /tmp/toyos6base/build/toy_os.img and /tmp/toyos6/build/toy_os.img differ
+Binary files /tmp/toyos6base/build/user_shell.o and /tmp/toyos6/build/user_shell.o differ
+Binary files /tmp/toyos6base/build/vgadrv.o and /tmp/toyos6/build/vgadrv.o differ
+Binary files /tmp/toyos6base/build/vgadrv.pe and /tmp/toyos6/build/vgadrv.pe differ
+Binary files /tmp/toyos6base/build/vgadrv.raw and /tmp/toyos6/build/vgadrv.raw differ
+diff -urN /tmp/toyos6base/build.sh /tmp/toyos6/build.sh
+--- /tmp/toyos6base/build.sh	2026-09-18 13:56:04.000000000 +0000
++++ /tmp/toyos6/build.sh	2026-09-18 14:18:59.713363036 +0000
+@@ -67,6 +67,7 @@
+ gcc $CFLAGS -c src/rt_deadline_diag.c -o build/rt_deadline_diag.o
+ gcc $CFLAGS -c src/rt_deadline_miss_diag.c -o build/rt_deadline_miss_diag.o
+ gcc $CFLAGS -c src/rt_period_skip_diag.c -o build/rt_period_skip_diag.o
++gcc $CFLAGS -c src/rt_timebase_diag.c -o build/rt_timebase_diag.o
+ 
+ # Additional EXE1 queue-validation programs. Each is linked independently at
+ # the same user image address because the kernel executes queue members
+@@ -218,6 +219,9 @@
+ ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_period_skip_diag.pe build/rt_period_skip_diag.o
+ objcopy --only-section=.text -O binary build/rt_period_skip_diag.pe build/rt_period_skip_diag.raw
+ make_exe1 build/rt_period_skip_diag.raw build/RTDSKIP.EXE 0
++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_timebase_diag.pe build/rt_timebase_diag.o
++objcopy --only-section=.text -O binary build/rt_timebase_diag.pe build/rt_timebase_diag.raw
++make_exe1 build/rt_timebase_diag.raw build/RTTIME.EXE 0
+ # Тестовый графический ресурс: чистый RAW 320x200x256, ровно 64000 байт.
+ # Важно: mkfat16 ниже получает все входные файлы из каталога build/.
+ # Поэтому ресурс сначала явно копируется из исходного каталога resources/
+@@ -272,13 +276,13 @@
+     mtid=`printf '%02d' "$i"`
+     EXECMT_FILES="$EXECMT_FILES build/MT${mtid}.EXE"
+ done
+-./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/DEADLINE.EXE=DEADLINE.EXE build/RTDMISS.EXE=RTDMISS.EXE build/RTDSKIP.EXE=RTDSKIP.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
++./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/DEADLINE.EXE=DEADLINE.EXE build/RTDMISS.EXE=RTDMISS.EXE build/RTDSKIP.EXE=RTDSKIP.EXE build/RTTIME.EXE=RTTIME.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
+ 
+ test -s build/disk.img || { echo "ERROR: mkfat16 finished without creating build/disk.img" >&2; exit 1; }
+ echo "[FAT16] disk.img created: `wc -c < build/disk.img | tr -d ' '` bytes"
+ 
+ # Verify every shipped EXE1 entry before writing the boot sector/kernel.
+-for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE DEADLINE.EXE RTDMISS.EXE RTDSKIP.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
++for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE DEADLINE.EXE RTDMISS.EXE RTDSKIP.EXE RTTIME.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
+     ./build/fat16check.exe build/disk.img "$qname"
+ done
+ if [ -f build/AUTOSTART.SH ]; then
+@@ -368,6 +372,7 @@
+ ./check_rtd_stage5_2_fix1.sh
+ ./check_rtd_stage5_2_fix2.sh
+ ./check_rtd_stage5_3.sh
++sh ./check_rtd_stage6_1.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/ARCHIVE_MANIFEST_RU.md /tmp/toyos6/changes/RTD/Stage6/Stage6_1/ARCHIVE_MANIFEST_RU.md
+--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/ARCHIVE_MANIFEST_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/ARCHIVE_MANIFEST_RU.md	2026-09-18 14:21:08.106347738 +0000
+@@ -0,0 +1,31 @@
++# Archive manifest — Stage 6.1
++
++База: ToyOS v67 RTD Stage 5.3.
++
++Новые/изменённые RTD-компоненты:
++
++- `src/kernel.c`
++- `src/user_shell.c`
++- `src/rtd.c`
++- `src/rt_deadline.h`
++- `src/rt_deadline_diag.c`
++- `src/rt_deadline_miss_diag.c`
++- `src/rt_period_skip_diag.c`
++- `src/rt_timebase_diag.c`
++- `tools/test_rt_timebase.c`
++- `check_rtd_stage6_1.sh`
++- `build.sh`
++- `check33.sh`
++- `check34.sh`
++- `check_rtd_stage5_1.sh`
++- `check_rtd_stage6_1.sh`
++- `tools/test_rt_deadline.c`
++- `tools/test_rt_timebase.c`
++- `README.md`
++- `DESIGN.md`
++
++Новый EXE1: `RTTIME.EXE`.
++
++Тестовые изменения также сохраняются для совместимости с новой dual-rate моделью времени.
++
++Каталог `build/` в исходный архив не включается.
+diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md /tmp/toyos6/changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md
+--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md	2026-09-18 14:18:34.678244156 +0000
+@@ -0,0 +1,26 @@
++# ToyOS v67 RTD Stage 6.1 — реальный RT timebase 100 Hz
++
++## Цель шага
++
++Добавить аппаратную временную сетку RT с шагом 10 ms, не меняя контракт существующего системного таймера `SYS_TIMER_GET=50 Hz`.
++
++## Изменения по шагам
++
++1. PIT теперь программируется на 100 Hz. Это означает один IRQ0 каждые 10 ms.
++2. Добавлен `rt_time_ticks`, который увеличивается на каждом IRQ0.
++3. Старый `timer_ticks` сохранён как логический 50 Hz счётчик. Он увеличивается на каждом втором IRQ0.
++4. При активной detached RT scheduler обслуживается на каждом IRQ0, то есть каждые 10 ms. Старый EXECMT scheduler без RT продолжает вызываться на каждом втором IRQ0, сохраняя 50 Hz cadence.
++5. Вся RT арифметика `period/release/deadline/runtime budget/SYS_RT_WAIT` переведена с `timer_ticks` на `rt_time_ticks`.
++6. `rt_deadline_ms_to_ticks()` теперь округляет миллисекунды вверх по 10 ms: 10 ms = 1 RT tick, 20 ms = 2, 40 ms = 4, 100 ms = 10.
++7. Добавлен `SYS_RT_TIME_GET=45`, возвращающий реальный RT счётчик 100 Hz.
++8. `SYS_TIMER_GET=3` не менялся по номеру и продолжает возвращать логический 50 Hz счётчик.
++9. Задержка запуска в `RTD.EXE` переведена на новый RT clock, поэтому задержки меньше 20 ms теперь могут быть представлены с шагом 10 ms.
++10. Добавлен обычный EXE1 `RTTIME.EXE`, который одновременно наблюдает оба счётчика.
++
++## Что намеренно НЕ менялось
++
++Не изменены ABI уже существующих syscall, F10, ESC, `SYS_RT_WAIT` по смыслу, scheduler priority/deadline policy, обычный EXE1 формат, EXECMT и VGA/text механизм.
++
++## Ограничение
++
++Аппаратно используется всё тот же PIT channel 0. Разница заключается в более частом IRQ0 и в разделении аппаратного RT счётчика и логического legacy system counter. `SYS_TIMER_GET` поэтому продолжает вести себя как 50 Hz интерфейс.
+diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/STAGE6_1_FULL.patch /tmp/toyos6/changes/RTD/Stage6/Stage6_1/STAGE6_1_FULL.patch
+--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/STAGE6_1_FULL.patch	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/STAGE6_1_FULL.patch	2026-09-18 14:21:08.418347925 +0000
+@@ -0,0 +1,400 @@
++diff -urN /tmp/toyos6base/DESIGN.md /tmp/toyos6/DESIGN.md
++--- /tmp/toyos6base/DESIGN.md	2026-09-15 15:30:21.000000000 +0000
+++++ /tmp/toyos6/DESIGN.md	2026-09-18 14:17:24.316877942 +0000
++@@ -203,3 +203,8 @@
++ `SYS_GETCWD=30` безопасно возвращает его Ring-3 shell. Благодаря тому, что существующие
++ `fat_lookup_path()` и `fat_resolve_parent()` используют один нормализатор, относительные
++ пути автоматически распространяются на файловые операции и загрузчик EXE1.
+++
+++
+++## v67 RTD Stage 6.1 — dual-rate time base
+++
+++The PIT is programmed at 100 Hz for the RT scheduler. A separate logical 50 Hz counter preserves the existing `SYS_TIMER_GET` contract. `rt_time_ticks` is the only clock used by detached RT release/deadline/budget calculations. The legacy EXECMT scheduler is still dispatched at the 50 Hz logical cadence. `SYS_RT_TIME_GET=45` exposes the 10 ms RT counter to Ring-3 diagnostics without changing existing syscall numbers.
++diff -urN /tmp/toyos6base/README.md /tmp/toyos6/README.md
++--- /tmp/toyos6base/README.md	2026-09-18 13:57:55.000000000 +0000
+++++ /tmp/toyos6/README.md	2026-09-18 14:20:14.891197122 +0000
++@@ -831,3 +831,12 @@
++ Программа намеренно работает несколько PIT-tick перед `SYS_RT_WAIT`. Для `period=20 ms` это позволяет увидеть несколько пропущенных release. После `SYS_RT_WAIT` строка `next-job` должна показывать новый `release`, находящийся в будущем относительно момента завершения, а `skipped` — количество пропущенных номинальных активаций.
++ 
++ Подробности: `changes/RTD/Stage5/Stage5_3/`.
+++
+++
+++## v67 RTD Stage 6.1 — отдельный RT timebase 100 Hz
+++
+++Stage 6.1 adds a real 10 ms RT timebase without changing the logical 50 Hz system timer exposed by `SYS_TIMER_GET`. The PIT hardware is programmed for 100 Hz; `rt_time_ticks` advances on every IRQ0, while the legacy `timer_ticks` advances on every second interrupt and therefore remains 50 Hz. The existing EXECMT scheduler continues to run on the logical 50 Hz cadence, while the detached RT scheduler is serviced at every 10 ms interrupt. RT `period/deadline/release` conversions now use the 100 Hz RT clock, so `10 ms` is exactly one RT tick, `20 ms` is two RT ticks, `40 ms` is four RT ticks, and `100 ms` is ten RT ticks. `SYS_RT_TIME_GET=45` exposes the RT clock to Ring 3; `SYS_TIMER_GET=3` remains the legacy 50 Hz system clock.
+++
+++The ordinary EXE1 diagnostic `RTTIME.EXE` compares both counters. Example: `exec RTD.EXE RTTIME.EXE 1000 1000 255`, then `F10`. It reports one RT tick per hardware interval and approximately one legacy system tick per two RT ticks.
+++
+++Подробности Stage 6.1: `changes/RTD/Stage6/Stage6_1/`.
++diff -urN /tmp/toyos6base/build/AUTOSTART.SH /tmp/toyos6/build/AUTOSTART.SH
++--- /tmp/toyos6base/build/AUTOSTART.SH	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/toyos6/build/AUTOSTART.SH	2026-09-18 14:20:38.797825608 +0000
++@@ -0,0 +1 @@
+++exec VGADRV.EXE SPLASH.RAW
++Binary files /tmp/toyos6base/build/COMDRV.EXE and /tmp/toyos6/build/COMDRV.EXE differ
++Binary files /tmp/toyos6base/build/DEADLINE.EXE and /tmp/toyos6/build/DEADLINE.EXE differ
++Binary files /tmp/toyos6base/build/HELLO.EXE and /tmp/toyos6/build/HELLO.EXE differ
++Binary files /tmp/toyos6base/build/LOADER.EXE and /tmp/toyos6/build/LOADER.EXE differ
++Binary files /tmp/toyos6base/build/MT01.EXE and /tmp/toyos6/build/MT01.EXE differ
++Binary files /tmp/toyos6base/build/MT02.EXE and /tmp/toyos6/build/MT02.EXE differ
++Binary files /tmp/toyos6base/build/MT03.EXE and /tmp/toyos6/build/MT03.EXE differ
++Binary files /tmp/toyos6base/build/MT04.EXE and /tmp/toyos6/build/MT04.EXE differ
++Binary files /tmp/toyos6base/build/MT05.EXE and /tmp/toyos6/build/MT05.EXE differ
++Binary files /tmp/toyos6base/build/MT06.EXE and /tmp/toyos6/build/MT06.EXE differ
++Binary files /tmp/toyos6base/build/MT07.EXE and /tmp/toyos6/build/MT07.EXE differ
++Binary files /tmp/toyos6base/build/MT08.EXE and /tmp/toyos6/build/MT08.EXE differ
++Binary files /tmp/toyos6base/build/MT09.EXE and /tmp/toyos6/build/MT09.EXE differ
++Binary files /tmp/toyos6base/build/MT10.EXE and /tmp/toyos6/build/MT10.EXE differ
++Binary files /tmp/toyos6base/build/MT11.EXE and /tmp/toyos6/build/MT11.EXE differ
++Binary files /tmp/toyos6base/build/MT12.EXE and /tmp/toyos6/build/MT12.EXE differ
++Binary files /tmp/toyos6base/build/MT13.EXE and /tmp/toyos6/build/MT13.EXE differ
++Binary files /tmp/toyos6base/build/MT14.EXE and /tmp/toyos6/build/MT14.EXE differ
++Binary files /tmp/toyos6base/build/MT15.EXE and /tmp/toyos6/build/MT15.EXE differ
++Binary files /tmp/toyos6base/build/MT16.EXE and /tmp/toyos6/build/MT16.EXE differ
++Binary files /tmp/toyos6base/build/MT17.EXE and /tmp/toyos6/build/MT17.EXE differ
++Binary files /tmp/toyos6base/build/MT18.EXE and /tmp/toyos6/build/MT18.EXE differ
++Binary files /tmp/toyos6base/build/MT19.EXE and /tmp/toyos6/build/MT19.EXE differ
++Binary files /tmp/toyos6base/build/MT20.EXE and /tmp/toyos6/build/MT20.EXE differ
++Binary files /tmp/toyos6base/build/MT21.EXE and /tmp/toyos6/build/MT21.EXE differ
++Binary files /tmp/toyos6base/build/MT22.EXE and /tmp/toyos6/build/MT22.EXE differ
++Binary files /tmp/toyos6base/build/MT23.EXE and /tmp/toyos6/build/MT23.EXE differ
++Binary files /tmp/toyos6base/build/MT24.EXE and /tmp/toyos6/build/MT24.EXE differ
++Binary files /tmp/toyos6base/build/MT25.EXE and /tmp/toyos6/build/MT25.EXE differ
++diff -urN /tmp/toyos6base/build/NET.CFG /tmp/toyos6/build/NET.CFG
++--- /tmp/toyos6base/build/NET.CFG	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/toyos6/build/NET.CFG	2026-09-18 14:20:34.218460283 +0000
++@@ -0,0 +1,10 @@
+++# NETDRV.EXE v58 — конфигурация QEMU user-mode networking + NE2000 ISA
+++# Все значения ASCII. Пустые строки и строки с # игнорируются.
+++BASE=300
+++MAC=52:54:00:12:34:56
+++IP=10.0.2.15
+++MASK=255.255.255.0
+++GATEWAY=10.0.2.2
+++PORT=8080
+++PATH=/
+++TIMEOUT=10
++Binary files /tmp/toyos6base/build/NETDRV.EXE and /tmp/toyos6/build/NETDRV.EXE differ
++diff -urN /tmp/toyos6base/build/NET_MAST.CFG /tmp/toyos6/build/NET_MAST.CFG
++--- /tmp/toyos6base/build/NET_MAST.CFG	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/toyos6/build/NET_MAST.CFG	2026-09-18 14:20:34.219813669 +0000
++@@ -0,0 +1,11 @@
+++# Toy OS v66.3 — MASTER для маршрутизируемой Wi-Fi сети без L2 bridge.
+++# Виртуальная подсеть ПК №1: 10.66.1.0/24.
+++# 10.66.1.1 — IP Windows на TAP tap0; 10.66.1.2 — Toy OS Master.
+++BASE=300
+++MAC=52:54:00:10:66:10
+++IP=10.66.1.2
+++MASK=255.255.255.0
+++GATEWAY=10.66.1.1
+++PORT=8080
+++PATH=/
+++TIMEOUT=10
++diff -urN /tmp/toyos6base/build/NET_SLV1.CFG /tmp/toyos6/build/NET_SLV1.CFG
++--- /tmp/toyos6base/build/NET_SLV1.CFG	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/toyos6/build/NET_SLV1.CFG	2026-09-18 14:20:34.221101161 +0000
++@@ -0,0 +1,11 @@
+++# Toy OS v66.3 — SLAVE1 для маршрутизируемой Wi-Fi сети без L2 bridge.
+++# Виртуальная подсеть ПК №2: 10.66.2.0/24.
+++# 10.66.2.1 — IP Windows на TAP tap0; 10.66.2.2 — Toy OS Slave1.
+++BASE=300
+++MAC=52:54:00:10:66:11
+++IP=10.66.2.2
+++MASK=255.255.255.0
+++GATEWAY=10.66.2.1
+++PORT=8080
+++PATH=/
+++TIMEOUT=10
++diff -urN /tmp/toyos6base/build/NET_SLV2.CFG /tmp/toyos6/build/NET_SLV2.CFG
++--- /tmp/toyos6base/build/NET_SLV2.CFG	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/toyos6/build/NET_SLV2.CFG	2026-09-18 14:20:34.222434679 +0000
++@@ -0,0 +1,11 @@
+++# Toy OS v66.3 — SLAVE2 для маршрутизируемой Wi-Fi сети без L2 bridge.
+++# Виртуальная подсеть ПК №2: 10.66.2.0/24.
+++# 10.66.2.1 — IP Windows на TAP tap0; 10.66.2.3 — Toy OS Slave2.
+++BASE=300
+++MAC=52:54:00:10:66:12
+++IP=10.66.2.3
+++MASK=255.255.255.0
+++GATEWAY=10.66.2.1
+++PORT=8080
+++PATH=/
+++TIMEOUT=10
++Binary files /tmp/toyos6base/build/QFILE.EXE and /tmp/toyos6/build/QFILE.EXE differ
++Binary files /tmp/toyos6base/build/QFROMEXE.EXE and /tmp/toyos6/build/QFROMEXE.EXE differ
++Binary files /tmp/toyos6base/build/QNESTED.EXE and /tmp/toyos6/build/QNESTED.EXE differ
++Binary files /tmp/toyos6base/build/QPASS.EXE and /tmp/toyos6/build/QPASS.EXE differ
++Binary files /tmp/toyos6base/build/QPORT.EXE and /tmp/toyos6/build/QPORT.EXE differ
++Binary files /tmp/toyos6base/build/QSIZE.EXE and /tmp/toyos6/build/QSIZE.EXE differ
++Binary files /tmp/toyos6base/build/QSTOP.EXE and /tmp/toyos6/build/QSTOP.EXE differ
++Binary files /tmp/toyos6base/build/RTD.EXE and /tmp/toyos6/build/RTD.EXE differ
++Binary files /tmp/toyos6base/build/RTDMISS.EXE and /tmp/toyos6/build/RTDMISS.EXE differ
++Binary files /tmp/toyos6base/build/RTDSKIP.EXE and /tmp/toyos6/build/RTDSKIP.EXE differ
++Binary files /tmp/toyos6base/build/RTTIME.EXE and /tmp/toyos6/build/RTTIME.EXE differ
++Binary files /tmp/toyos6base/build/SENSOR.EXE and /tmp/toyos6/build/SENSOR.EXE differ
++Binary files /tmp/toyos6base/build/SENSOR1.EXE and /tmp/toyos6/build/SENSOR1.EXE differ
++Binary files /tmp/toyos6base/build/SENSOR2.EXE and /tmp/toyos6/build/SENSOR2.EXE differ
++Binary files /tmp/toyos6base/build/SPLASH.RAW and /tmp/toyos6/build/SPLASH.RAW differ
++Binary files /tmp/toyos6base/build/VGADRV.EXE and /tmp/toyos6/build/VGADRV.EXE differ
++Binary files /tmp/toyos6base/build/boot.bin and /tmp/toyos6/build/boot.bin differ
++Binary files /tmp/toyos6base/build/boot.o and /tmp/toyos6/build/boot.o differ
++Binary files /tmp/toyos6base/build/boot.pe and /tmp/toyos6/build/boot.pe differ
++Binary files /tmp/toyos6base/build/comdrv.o and /tmp/toyos6/build/comdrv.o differ
++Binary files /tmp/toyos6base/build/comdrv.pe and /tmp/toyos6/build/comdrv.pe differ
++Binary files /tmp/toyos6base/build/comdrv.raw and /tmp/toyos6/build/comdrv.raw differ
++Binary files /tmp/toyos6base/build/disk.img and /tmp/toyos6/build/disk.img differ
++Binary files /tmp/toyos6base/build/fat16check.exe and /tmp/toyos6/build/fat16check.exe differ
++Binary files /tmp/toyos6base/build/hello.o and /tmp/toyos6/build/hello.o differ
++Binary files /tmp/toyos6base/build/hello.pe and /tmp/toyos6/build/hello.pe differ
++Binary files /tmp/toyos6base/build/hello.raw and /tmp/toyos6/build/hello.raw differ
++Binary files /tmp/toyos6base/build/isr.o and /tmp/toyos6/build/isr.o differ
++Binary files /tmp/toyos6base/build/kernel.bin and /tmp/toyos6/build/kernel.bin differ
++Binary files /tmp/toyos6base/build/kernel.coff.o and /tmp/toyos6/build/kernel.coff.o differ
++Binary files /tmp/toyos6base/build/kernel.o and /tmp/toyos6/build/kernel.o differ
++Binary files /tmp/toyos6base/build/kernel.pe and /tmp/toyos6/build/kernel.pe differ
++Binary files /tmp/toyos6base/build/loader.o and /tmp/toyos6/build/loader.o differ
++Binary files /tmp/toyos6base/build/loader.pe and /tmp/toyos6/build/loader.pe differ
++Binary files /tmp/toyos6base/build/loader.raw and /tmp/toyos6/build/loader.raw differ
++Binary files /tmp/toyos6base/build/mkexe.exe and /tmp/toyos6/build/mkexe.exe differ
++Binary files /tmp/toyos6base/build/mkfat16.exe and /tmp/toyos6/build/mkfat16.exe differ
++Binary files /tmp/toyos6base/build/mt01.o and /tmp/toyos6/build/mt01.o differ
++Binary files /tmp/toyos6base/build/mt01.pe and /tmp/toyos6/build/mt01.pe differ
++Binary files /tmp/toyos6base/build/mt01.raw and /tmp/toyos6/build/mt01.raw differ
++Binary files /tmp/toyos6base/build/mt02.o and /tmp/toyos6/build/mt02.o differ
++Binary files /tmp/toyos6base/build/mt02.pe and /tmp/toyos6/build/mt02.pe differ
++Binary files /tmp/toyos6base/build/mt02.raw and /tmp/toyos6/build/mt02.raw differ
++Binary files /tmp/toyos6base/build/mt03.o and /tmp/toyos6/build/mt03.o differ
++Binary files /tmp/toyos6base/build/mt03.pe and /tmp/toyos6/build/mt03.pe differ
++Binary files /tmp/toyos6base/build/mt03.raw and /tmp/toyos6/build/mt03.raw differ
++Binary files /tmp/toyos6base/build/mt04.o and /tmp/toyos6/build/mt04.o differ
++Binary files /tmp/toyos6base/build/mt04.pe and /tmp/toyos6/build/mt04.pe differ
++Binary files /tmp/toyos6base/build/mt04.raw and /tmp/toyos6/build/mt04.raw differ
++Binary files /tmp/toyos6base/build/mt05.o and /tmp/toyos6/build/mt05.o differ
++Binary files /tmp/toyos6base/build/mt05.pe and /tmp/toyos6/build/mt05.pe differ
++Binary files /tmp/toyos6base/build/mt05.raw and /tmp/toyos6/build/mt05.raw differ
++Binary files /tmp/toyos6base/build/mt06.o and /tmp/toyos6/build/mt06.o differ
++Binary files /tmp/toyos6base/build/mt06.pe and /tmp/toyos6/build/mt06.pe differ
++Binary files /tmp/toyos6base/build/mt06.raw and /tmp/toyos6/build/mt06.raw differ
++Binary files /tmp/toyos6base/build/mt07.o and /tmp/toyos6/build/mt07.o differ
++Binary files /tmp/toyos6base/build/mt07.pe and /tmp/toyos6/build/mt07.pe differ
++Binary files /tmp/toyos6base/build/mt07.raw and /tmp/toyos6/build/mt07.raw differ
++Binary files /tmp/toyos6base/build/mt08.o and /tmp/toyos6/build/mt08.o differ
++Binary files /tmp/toyos6base/build/mt08.pe and /tmp/toyos6/build/mt08.pe differ
++Binary files /tmp/toyos6base/build/mt08.raw and /tmp/toyos6/build/mt08.raw differ
++Binary files /tmp/toyos6base/build/mt09.o and /tmp/toyos6/build/mt09.o differ
++Binary files /tmp/toyos6base/build/mt09.pe and /tmp/toyos6/build/mt09.pe differ
++Binary files /tmp/toyos6base/build/mt09.raw and /tmp/toyos6/build/mt09.raw differ
++Binary files /tmp/toyos6base/build/mt10.o and /tmp/toyos6/build/mt10.o differ
++Binary files /tmp/toyos6base/build/mt10.pe and /tmp/toyos6/build/mt10.pe differ
++Binary files /tmp/toyos6base/build/mt10.raw and /tmp/toyos6/build/mt10.raw differ
++Binary files /tmp/toyos6base/build/mt11.o and /tmp/toyos6/build/mt11.o differ
++Binary files /tmp/toyos6base/build/mt11.pe and /tmp/toyos6/build/mt11.pe differ
++Binary files /tmp/toyos6base/build/mt11.raw and /tmp/toyos6/build/mt11.raw differ
++Binary files /tmp/toyos6base/build/mt12.o and /tmp/toyos6/build/mt12.o differ
++Binary files /tmp/toyos6base/build/mt12.pe and /tmp/toyos6/build/mt12.pe differ
++Binary files /tmp/toyos6base/build/mt12.raw and /tmp/toyos6/build/mt12.raw differ
++Binary files /tmp/toyos6base/build/mt13.o and /tmp/toyos6/build/mt13.o differ
++Binary files /tmp/toyos6base/build/mt13.pe and /tmp/toyos6/build/mt13.pe differ
++Binary files /tmp/toyos6base/build/mt13.raw and /tmp/toyos6/build/mt13.raw differ
++Binary files /tmp/toyos6base/build/mt14.o and /tmp/toyos6/build/mt14.o differ
++Binary files /tmp/toyos6base/build/mt14.pe and /tmp/toyos6/build/mt14.pe differ
++Binary files /tmp/toyos6base/build/mt14.raw and /tmp/toyos6/build/mt14.raw differ
++Binary files /tmp/toyos6base/build/mt15.o and /tmp/toyos6/build/mt15.o differ
++Binary files /tmp/toyos6base/build/mt15.pe and /tmp/toyos6/build/mt15.pe differ
++Binary files /tmp/toyos6base/build/mt15.raw and /tmp/toyos6/build/mt15.raw differ
++Binary files /tmp/toyos6base/build/mt16.o and /tmp/toyos6/build/mt16.o differ
++Binary files /tmp/toyos6base/build/mt16.pe and /tmp/toyos6/build/mt16.pe differ
++Binary files /tmp/toyos6base/build/mt16.raw and /tmp/toyos6/build/mt16.raw differ
++Binary files /tmp/toyos6base/build/mt17.o and /tmp/toyos6/build/mt17.o differ
++Binary files /tmp/toyos6base/build/mt17.pe and /tmp/toyos6/build/mt17.pe differ
++Binary files /tmp/toyos6base/build/mt17.raw and /tmp/toyos6/build/mt17.raw differ
++Binary files /tmp/toyos6base/build/mt18.o and /tmp/toyos6/build/mt18.o differ
++Binary files /tmp/toyos6base/build/mt18.pe and /tmp/toyos6/build/mt18.pe differ
++Binary files /tmp/toyos6base/build/mt18.raw and /tmp/toyos6/build/mt18.raw differ
++Binary files /tmp/toyos6base/build/mt19.o and /tmp/toyos6/build/mt19.o differ
++Binary files /tmp/toyos6base/build/mt19.pe and /tmp/toyos6/build/mt19.pe differ
++Binary files /tmp/toyos6base/build/mt19.raw and /tmp/toyos6/build/mt19.raw differ
++Binary files /tmp/toyos6base/build/mt20.o and /tmp/toyos6/build/mt20.o differ
++Binary files /tmp/toyos6base/build/mt20.pe and /tmp/toyos6/build/mt20.pe differ
++Binary files /tmp/toyos6base/build/mt20.raw and /tmp/toyos6/build/mt20.raw differ
++Binary files /tmp/toyos6base/build/mt21.o and /tmp/toyos6/build/mt21.o differ
++Binary files /tmp/toyos6base/build/mt21.pe and /tmp/toyos6/build/mt21.pe differ
++Binary files /tmp/toyos6base/build/mt21.raw and /tmp/toyos6/build/mt21.raw differ
++Binary files /tmp/toyos6base/build/mt22.o and /tmp/toyos6/build/mt22.o differ
++Binary files /tmp/toyos6base/build/mt22.pe and /tmp/toyos6/build/mt22.pe differ
++Binary files /tmp/toyos6base/build/mt22.raw and /tmp/toyos6/build/mt22.raw differ
++Binary files /tmp/toyos6base/build/mt23.o and /tmp/toyos6/build/mt23.o differ
++Binary files /tmp/toyos6base/build/mt23.pe and /tmp/toyos6/build/mt23.pe differ
++Binary files /tmp/toyos6base/build/mt23.raw and /tmp/toyos6/build/mt23.raw differ
++Binary files /tmp/toyos6base/build/mt24.o and /tmp/toyos6/build/mt24.o differ
++Binary files /tmp/toyos6base/build/mt24.pe and /tmp/toyos6/build/mt24.pe differ
++Binary files /tmp/toyos6base/build/mt24.raw and /tmp/toyos6/build/mt24.raw differ
++Binary files /tmp/toyos6base/build/mt25.o and /tmp/toyos6/build/mt25.o differ
++Binary files /tmp/toyos6base/build/mt25.pe and /tmp/toyos6/build/mt25.pe differ
++Binary files /tmp/toyos6base/build/mt25.raw and /tmp/toyos6/build/mt25.raw differ
++Binary files /tmp/toyos6base/build/netdrv.o and /tmp/toyos6/build/netdrv.o differ
++Binary files /tmp/toyos6base/build/netdrv.pe and /tmp/toyos6/build/netdrv.pe differ
++Binary files /tmp/toyos6base/build/netdrv.raw and /tmp/toyos6/build/netdrv.raw differ
++Binary files /tmp/toyos6base/build/path.o and /tmp/toyos6/build/path.o differ
++Binary files /tmp/toyos6base/build/pathcheck.exe and /tmp/toyos6/build/pathcheck.exe differ
++Binary files /tmp/toyos6base/build/png2raw.exe and /tmp/toyos6/build/png2raw.exe differ
++Binary files /tmp/toyos6base/build/qfile.o and /tmp/toyos6/build/qfile.o differ
++Binary files /tmp/toyos6base/build/qfile.pe and /tmp/toyos6/build/qfile.pe differ
++Binary files /tmp/toyos6base/build/qfile.raw and /tmp/toyos6/build/qfile.raw differ
++Binary files /tmp/toyos6base/build/qfromexe.o and /tmp/toyos6/build/qfromexe.o differ
++Binary files /tmp/toyos6base/build/qfromexe.pe and /tmp/toyos6/build/qfromexe.pe differ
++Binary files /tmp/toyos6base/build/qfromexe.raw and /tmp/toyos6/build/qfromexe.raw differ
++Binary files /tmp/toyos6base/build/qnested.o and /tmp/toyos6/build/qnested.o differ
++Binary files /tmp/toyos6base/build/qnested.pe and /tmp/toyos6/build/qnested.pe differ
++Binary files /tmp/toyos6base/build/qnested.raw and /tmp/toyos6/build/qnested.raw differ
++Binary files /tmp/toyos6base/build/qpass.o and /tmp/toyos6/build/qpass.o differ
++Binary files /tmp/toyos6base/build/qpass.pe and /tmp/toyos6/build/qpass.pe differ
++Binary files /tmp/toyos6base/build/qpass.raw and /tmp/toyos6/build/qpass.raw differ
++Binary files /tmp/toyos6base/build/qport.o and /tmp/toyos6/build/qport.o differ
++Binary files /tmp/toyos6base/build/qport.pe and /tmp/toyos6/build/qport.pe differ
++Binary files /tmp/toyos6base/build/qport.raw and /tmp/toyos6/build/qport.raw differ
++Binary files /tmp/toyos6base/build/qsize.o and /tmp/toyos6/build/qsize.o differ
++Binary files /tmp/toyos6base/build/qsize.pe and /tmp/toyos6/build/qsize.pe differ
++Binary files /tmp/toyos6base/build/qsize.raw and /tmp/toyos6/build/qsize.raw differ
++Binary files /tmp/toyos6base/build/qstop.o and /tmp/toyos6/build/qstop.o differ
++Binary files /tmp/toyos6base/build/qstop.pe and /tmp/toyos6/build/qstop.pe differ
++Binary files /tmp/toyos6base/build/qstop.raw and /tmp/toyos6/build/qstop.raw differ
++Binary files /tmp/toyos6base/build/rt_deadline_diag.o and /tmp/toyos6/build/rt_deadline_diag.o differ
++Binary files /tmp/toyos6base/build/rt_deadline_diag.pe and /tmp/toyos6/build/rt_deadline_diag.pe differ
++Binary files /tmp/toyos6base/build/rt_deadline_diag.raw and /tmp/toyos6/build/rt_deadline_diag.raw differ
++Binary files /tmp/toyos6base/build/rt_deadline_miss_diag.o and /tmp/toyos6/build/rt_deadline_miss_diag.o differ
++Binary files /tmp/toyos6base/build/rt_deadline_miss_diag.pe and /tmp/toyos6/build/rt_deadline_miss_diag.pe differ
++Binary files /tmp/toyos6base/build/rt_deadline_miss_diag.raw and /tmp/toyos6/build/rt_deadline_miss_diag.raw differ
++Binary files /tmp/toyos6base/build/rt_period_skip_diag.o and /tmp/toyos6/build/rt_period_skip_diag.o differ
++Binary files /tmp/toyos6base/build/rt_period_skip_diag.pe and /tmp/toyos6/build/rt_period_skip_diag.pe differ
++Binary files /tmp/toyos6base/build/rt_period_skip_diag.raw and /tmp/toyos6/build/rt_period_skip_diag.raw differ
++Binary files /tmp/toyos6base/build/rt_sensor.o and /tmp/toyos6/build/rt_sensor.o differ
++Binary files /tmp/toyos6base/build/rt_sensor.pe and /tmp/toyos6/build/rt_sensor.pe differ
++Binary files /tmp/toyos6base/build/rt_sensor.raw and /tmp/toyos6/build/rt_sensor.raw differ
++Binary files /tmp/toyos6base/build/rt_sensor1.o and /tmp/toyos6/build/rt_sensor1.o differ
++Binary files /tmp/toyos6base/build/rt_sensor1.pe and /tmp/toyos6/build/rt_sensor1.pe differ
++Binary files /tmp/toyos6base/build/rt_sensor1.raw and /tmp/toyos6/build/rt_sensor1.raw differ
++Binary files /tmp/toyos6base/build/rt_sensor2.o and /tmp/toyos6/build/rt_sensor2.o differ
++Binary files /tmp/toyos6base/build/rt_sensor2.pe and /tmp/toyos6/build/rt_sensor2.pe differ
++Binary files /tmp/toyos6base/build/rt_sensor2.raw and /tmp/toyos6/build/rt_sensor2.raw differ
++Binary files /tmp/toyos6base/build/rt_timebase_diag.o and /tmp/toyos6/build/rt_timebase_diag.o differ
++Binary files /tmp/toyos6base/build/rt_timebase_diag.pe and /tmp/toyos6/build/rt_timebase_diag.pe differ
++Binary files /tmp/toyos6base/build/rt_timebase_diag.raw and /tmp/toyos6/build/rt_timebase_diag.raw differ
++Binary files /tmp/toyos6base/build/rtd.o and /tmp/toyos6/build/rtd.o differ
++Binary files /tmp/toyos6base/build/rtd.pe and /tmp/toyos6/build/rtd.pe differ
++Binary files /tmp/toyos6base/build/rtd.raw and /tmp/toyos6/build/rtd.raw differ
++Binary files /tmp/toyos6base/build/toy_os.img and /tmp/toyos6/build/toy_os.img differ
++Binary files /tmp/toyos6base/build/user_shell.o and /tmp/toyos6/build/user_shell.o differ
++Binary files /tmp/toyos6base/build/vgadrv.o and /tmp/toyos6/build/vgadrv.o differ
++Binary files /tmp/toyos6base/build/vgadrv.pe and /tmp/toyos6/build/vgadrv.pe differ
++Binary files /tmp/toyos6base/build/vgadrv.raw and /tmp/toyos6/build/vgadrv.raw differ
++diff -urN /tmp/toyos6base/build.sh /tmp/toyos6/build.sh
++--- /tmp/toyos6base/build.sh	2026-09-18 13:56:04.000000000 +0000
+++++ /tmp/toyos6/build.sh	2026-09-18 14:18:59.713363036 +0000
++@@ -67,6 +67,7 @@
++ gcc $CFLAGS -c src/rt_deadline_diag.c -o build/rt_deadline_diag.o
++ gcc $CFLAGS -c src/rt_deadline_miss_diag.c -o build/rt_deadline_miss_diag.o
++ gcc $CFLAGS -c src/rt_period_skip_diag.c -o build/rt_period_skip_diag.o
+++gcc $CFLAGS -c src/rt_timebase_diag.c -o build/rt_timebase_diag.o
++ 
++ # Additional EXE1 queue-validation programs. Each is linked independently at
++ # the same user image address because the kernel executes queue members
++@@ -218,6 +219,9 @@
++ ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_period_skip_diag.pe build/rt_period_skip_diag.o
++ objcopy --only-section=.text -O binary build/rt_period_skip_diag.pe build/rt_period_skip_diag.raw
++ make_exe1 build/rt_period_skip_diag.raw build/RTDSKIP.EXE 0
+++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_timebase_diag.pe build/rt_timebase_diag.o
+++objcopy --only-section=.text -O binary build/rt_timebase_diag.pe build/rt_timebase_diag.raw
+++make_exe1 build/rt_timebase_diag.raw build/RTTIME.EXE 0
++ # Тестовый графический ресурс: чистый RAW 320x200x256, ровно 64000 байт.
++ # Важно: mkfat16 ниже получает все входные файлы из каталога build/.
++ # Поэтому ресурс сначала явно копируется из исходного каталога resources/
++@@ -272,13 +276,13 @@
++     mtid=`printf '%02d' "$i"`
++     EXECMT_FILES="$EXECMT_FILES build/MT${mtid}.EXE"
++ done
++-./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/DEADLINE.EXE=DEADLINE.EXE build/RTDMISS.EXE=RTDMISS.EXE build/RTDSKIP.EXE=RTDSKIP.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
+++./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/DEADLINE.EXE=DEADLINE.EXE build/RTDMISS.EXE=RTDMISS.EXE build/RTDSKIP.EXE=RTDSKIP.EXE build/RTTIME.EXE=RTTIME.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
++ 
++ test -s build/disk.img || { echo "ERROR: mkfat16 finished without creating build/disk.img" >&2; exit 1; }
++ echo "[FAT16] disk.img created: `wc -c < build/disk.img | tr -d ' '` bytes"
++ 
++ # Verify every shipped EXE1 entry before writing the boot sector/kernel.
++-for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE DEADLINE.EXE RTDMISS.EXE RTDSKIP.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
+++for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE DEADLINE.EXE RTDMISS.EXE RTDSKIP.EXE RTTIME.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
++     ./build/fat16check.exe build/disk.img "$qname"
++ done
++ if [ -f build/AUTOSTART.SH ]; then
++@@ -368,6 +372,7 @@
++ ./check_rtd_stage5_2_fix1.sh
++ ./check_rtd_stage5_2_fix2.sh
++ ./check_rtd_stage5_3.sh
+++sh ./check_rtd_stage6_1.sh
++ ./check71.sh
++ ./check72.sh
++ ./check73.sh
++diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/ARCHIVE_MANIFEST_RU.md /tmp/toyos6/changes/RTD/Stage6/Stage6_1/ARCHIVE_MANIFEST_RU.md
++--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/ARCHIVE_MANIFEST_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/ARCHIVE_MANIFEST_RU.md	2026-09-18 14:21:08.106347738 +0000
++@@ -0,0 +1,31 @@
+++# Archive manifest — Stage 6.1
+++
+++База: ToyOS v67 RTD Stage 5.3.
+++
+++Новые/изменённые RTD-компоненты:
+++
+++- `src/kernel.c`
+++- `src/user_shell.c`
+++- `src/rtd.c`
+++- `src/rt_deadline.h`
+++- `src/rt_deadline_diag.c`
+++- `src/rt_deadline_miss_diag.c`
+++- `src/rt_period_skip_diag.c`
+++- `src/rt_timebase_diag.c`
+++- `tools/test_rt_timebase.c`
+++- `check_rtd_stage6_1.sh`
+++- `build.sh`
+++- `check33.sh`
+++- `check34.sh`
+++- `check_rtd_stage5_1.sh`
+++- `check_rtd_stage6_1.sh`
+++- `tools/test_rt_deadline.c`
+++- `tools/test_rt_timebase.c`
+++- `README.md`
+++- `DESIGN.md`
+++
+++Новый EXE1: `RTTIME.EXE`.
+++
+++Тестовые изменения также сохраняются для совместимости с новой dual-rate моделью времени.
+++
+++Каталог `build/` в исходный архив не включается.
++diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md /tmp/toyos6/changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md
++--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md	2026-09-18 14:18:34.678244156 +0000
++@@ -0,0 +1,26 @@
+++# ToyOS v67 RTD Stage 6.1 — реальный RT timebase 100 Hz
+++
+++## Цель шага
+++
+++Добавить аппаратную временную сетку RT с шагом 10 ms, не меняя контракт существующего системного таймера `SYS_TIMER_GET=50 Hz`.
+++
+++## Изменения по шагам
+++
+++1. PIT теперь программируется на 100 Hz. Это означает один IRQ0 каждые 10 ms.
+++2. Добавлен `rt_time_ticks`, который увеличивается на каждом IRQ0.
+++3. Старый `timer_ticks` сохранён как логический 50 Hz счётчик. Он увеличивается на каждом втором IRQ0.
+++4. При активной detached RT scheduler обслуживается на каждом IRQ0, то есть каждые 10 ms. Старый EXECMT scheduler без RT продолжает вызываться на каждом втором IRQ0, сохраняя 50 Hz cadence.
+++5. Вся RT арифметика `period/release/deadline/runtime budget/SYS_RT_WAIT` переведена с `timer_ticks` на `rt_time_ticks`.
+++6. `rt_deadline_ms_to_ticks()` теперь округляет миллисекунды вверх по 10 ms: 10 ms = 1 RT tick, 20 ms = 2, 40 ms = 4, 100 ms = 10.
+++7. Добавлен `SYS_RT_TIME_GET=45`, возвращающий реальный RT счётчик 100 Hz.
+++8. `SYS_TIMER_GET=3` не менялся по номеру и продолжает возвращать логический 50 Hz счётчик.
+++9. Задержка запуска в `RTD.EXE` переведена на новый RT clock, поэтому задержки меньше 20 ms теперь могут быть представлены с шагом 10 ms.
+++10. Добавлен обычный EXE1 `RTTIME.EXE`, который одновременно наблюдает оба счётчика.
+++
+++## Что намеренно НЕ менялось
+++
+++Не изменены ABI уже существующих syscall, F10, ESC, `SYS_RT_WAIT` по смыслу, scheduler priority/deadline policy, обычный EXE1 формат, EXECMT и VGA/text механизм.
+++
+++## Ограничение
+++
+++Аппаратно используется всё тот же PIT channel 0. Разница заключается в более частом IRQ0 и в разделении аппаратного RT счётчика и логического legacy system counter. `SYS_TIMER_GET` поэтому продолжает вести себя как 50 Hz интерфейс.
+diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/STEP_LOG_RU.md /tmp/toyos6/changes/RTD/Stage6/Stage6_1/STEP_LOG_RU.md
+--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/STEP_LOG_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/STEP_LOG_RU.md	2026-09-18 14:18:34.684536399 +0000
+@@ -0,0 +1,25 @@
++# Stage 6.1 — журнал изменений
++
++### Шаг 1
++Добавлен отдельный аппаратный RT timebase 100 Hz.
++
++### Шаг 2
++Сохранён logical 50 Hz `timer_ticks` для обратной совместимости `SYS_TIMER_GET`.
++
++### Шаг 3
++RT scheduler переведён на обслуживание каждого IRQ0.
++
++### Шаг 4
++EXECMT оставлен на каждом втором IRQ0.
++
++### Шаг 5
++RT period/deadline/release/runtime budget переведены на 10 ms tick.
++
++### Шаг 6
++Добавлен `SYS_RT_TIME_GET=45`.
++
++### Шаг 7
++Добавлен `RTTIME.EXE` для совместной диагностики двух часов.
++
++### Шаг 8
++Обновлены regression tests и build pipeline.
+diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/TEST_PLAN_RU.md /tmp/toyos6/changes/RTD/Stage6/Stage6_1/TEST_PLAN_RU.md
+--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/TEST_PLAN_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/TEST_PLAN_RU.md	2026-09-18 14:20:13.850121409 +0000
+@@ -0,0 +1,122 @@
++# Тест-план ToyOS v67 RTD Stage 6.1
++
++## 1. Host focused test
++
++Из корня проекта:
++
++```sh
++sh ./check_rtd_stage6_1.sh
++```
++
++Ожидается:
++
++```text
++RTD Stage 6.1 dual-rate timebase checks passed
++```
++
++Проверяются преобразования 1/10/11/20/40/100 ms, 32-bit boundary и модель «10 RT ticks = 5 system ticks».
++
++## 2. Проверка старого 50 Hz системного таймера
++
++Загрузить ToyOS и выполнить существующую проверку `pit-test`. Её критерий не изменён: `SYS_TIMER_GET` должен увеличиваться раз в 20 ms логического времени.
++
++Можно также выполнить:
++
++```text
++syscall 3
++```
++
++и убедиться по выводу, что используется `50 Hz system`.
++
++## 3. Проверка нового RT времени (100 Hz)
++
++Запустить:
++
++```text
++exec RTD.EXE RTTIME.EXE 1000 1000 255
++```
++
++затем:
++
++```text
++F10
++```
++
++Ожидается:
++
++```text
++RTTIME: started ordinary EXE1 (ESC to stop) RT=100Hz/10ms SYSTEM=50Hz/20ms
++RTTIME: rt_delta=1 system_delta=0 ...
++RTTIME: rt_delta=1 system_delta=1 ...
++RTTIME: rt_delta=1 system_delta=0 ...
++...
++RTTIME: 12 RT ticks observed; expected 12 RT ticks and about 6 system ticks
++```
++
++Наблюдаемый критерий: `rt_delta` должен быть 1 для каждого следующего аппаратного RT tick; `system_delta` появляется примерно на каждом втором RT tick.
++
++## 4. Реальный 10 ms период
++
++Подготовить:
++
++```text
++exec RTD.EXE SENSOR1.EXE 10 10 3
++F10
++```
++
++У `SENSOR1` одна RT release должна соответствовать одному RT tick. Важно: `SYS_TIMER_GET` здесь не используется как источник периода; RT scheduler работает по `rt_time_ticks`.
++
++## 5. Регрессия 20/40/100 ms
++
++Повторить уже подтверждённые тесты:
++
++```text
++exec RTD.EXE SENSOR1.EXE 20 20 3
++F10
++```
++
++```text
++exec RTD.EXE SENSOR1.EXE 40 40 3
++F10
++```
++
++```text
++exec RTD.EXE SENSOR1.EXE 100 100 3
++F10
++```
++
++Ожидается соответственно 2, 4 и 10 RT ticks между releases.
++
++## 6. Проверка delay
++
++Команда:
++
++```text
++exec RTD.EXE SENSOR1.EXE 10 10 3 30
++```
++
++не должна использовать старую 20 ms сетку: минимальный шаг задержки теперь 10 ms.
++
++## 7. ESC
++
++После запуска `SENSOR1` или `RTTIME` нажать ESC. Ожидается обычный уже проверенный путь:
++
++```text
++...: ESC -> stopped
++toy0>
++```
++
++## 8. Регрессия EXECMT
++
++Без активных RT-задач выполнить существующий `mt-test`. Его logical scheduler cadence остаётся 50 Hz.
++
++## 9. Критерий принятия
++
++Stage 6.1 считается успешным только если одновременно подтверждены:
++
++- `SYS_TIMER_GET` остаётся 50 Hz;
++- `SYS_RT_TIME_GET` даёт 10 ms RT ticks;
++- 10 ms RT period реально достижим;
++- 20/40/100 ms сохраняют ожидаемую кратность;
++- F10/ESC/`toy0>` не регрессировали;
++- EXECMT продолжает работать на 50 Hz cadence.
+diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/TEST_RESULTS_RU.md /tmp/toyos6/changes/RTD/Stage6/Stage6_1/TEST_RESULTS_RU.md
+--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/TEST_RESULTS_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/TEST_RESULTS_RU.md	2026-09-18 14:21:07.430347324 +0000
+@@ -0,0 +1,52 @@
++# Stage 6.1 — результаты проверки
++
++## Автоматические focused-тесты
++
++Успешно:
++
++```text
++RTD Stage 4.1 priority comparator checks passed
++RTD Stage 4.2 priority arbitration checks passed
++Stage 4.3 diagnostic source/build assertions passed
++RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed
++Stage 4.4 priority-preemption model passed
++RTD Stage 4.4 priority-preemption checks passed
++RTD Stage 5.1 absolute deadline checks passed
++RTD Stage 5.1 FIX1 absolute-deadline immutability checks passed
++RTD Stage 5.2 deadline-miss arbitration model passed
++RTD Stage 5.2 deadline-miss best-effort checks passed
++RTD Stage 5.2 FIX1 exact runtime scenario model passed
++RTD Stage 5.2 FIX1 deadline-miss policy checks passed
++RTD Stage 5.2 FIX2 recount/status checks passed
++RTD Stage 5.3 periodic release/no-backlog checks passed
++RTD Stage 6.1 dual-rate timebase model passed
++RTD Stage 6.1 dual-rate timebase checks passed
++```
++
++## Компиляция
++
++Изменённые RTD-компоненты успешно компилируются как 32-bit freestanding C. В контейнерной среде остаются два известных старых warning `unused-function`, относящиеся к существующему коду `fat_find_free_dir()` и `sys_ls()`; новых warning от Stage 6.1 не добавлено.
++
++## Сборка образа
++
++Адаптированная локальная сборка создала:
++
++```text
++kernel.bin = 53984 bytes
++kernel slot = 106/128 sectors
++RTTIME.EXE = 665 bytes
++RTD.EXE = 1367 bytes
++SENSOR.EXE = 746 bytes
++SENSOR1.EXE = 1085 bytes
++SENSOR2.EXE = 1085 bytes
++RTDMISS.EXE = 1006 bytes
++RTDSKIP.EXE = 947 bytes
++```
++
++Все перечисленные файлы прошли `fat16check` и попали в FAT16 root.
++
++После сборки `build.sh` дошёл до существующей `check13.sh`, которая исторически ищет устаревшую точную текстовую форму отображения EXE stack page. Эта остановка не связана с Stage 6.1.
++
++## Runtime
++
++Аппаратный runtime в QEMU в текущем окружении не выполнен: `qemu-system-i386` отсутствует. Поэтому следующие проверки являются целевым runtime-планом, а не заявленным результатом локального boot.
+diff -urN /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/VERIFICATION_RU.md /tmp/toyos6/changes/RTD/Stage6/Stage6_1/VERIFICATION_RU.md
+--- /tmp/toyos6base/changes/RTD/Stage6/Stage6_1/VERIFICATION_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/changes/RTD/Stage6/Stage6_1/VERIFICATION_RU.md	2026-09-18 14:18:34.682244159 +0000
+@@ -0,0 +1,28 @@
++# Stage 6.1 — Verification
++
++## Source-level verification
++
++- `RT_TIME_HZ=100` — present.
++- `rt_time_ticks` increments on every IRQ0 — present.
++- `timer_ticks` increments on every second IRQ0 — present.
++- Detached RT scheduler is serviced on every hardware tick — present.
++- Legacy EXECMT scheduler is serviced on logical 50 Hz ticks — present.
++- `SYS_RT_TIME_GET=45` returns `rt_time_ticks` — present.
++- RT release/deadline/wait paths use `rt_time_ticks` — present.
++
++## Host verification
++
++`check_rtd_stage6_1.sh` passed.
++
++## Expected timing mapping
++
++| Requested | RT ticks |
++|---:|---:|
++| 10 ms | 1 |
++| 20 ms | 2 |
++| 40 ms | 4 |
++| 100 ms | 10 |
++
++## Runtime limitation
++
++The development environment used for this archive does not contain `qemu-system-i386`, therefore hardware boot/runtime for this step is not claimed as locally verified. The runtime test plan above must be performed on the target ToyOS environment.
+diff -urN /tmp/toyos6base/check33.sh /tmp/toyos6/check33.sh
+--- /tmp/toyos6base/check33.sh	2026-09-13 12:03:42.000000000 +0000
++++ /tmp/toyos6/check33.sh	2026-09-18 14:17:24.314840295 +0000
+@@ -2,9 +2,11 @@
+ set -eu
+ fail(){ echo "FAIL: $1" >&2; exit 1; }
+ grep -q '#define PIT_HZ 50u' src/kernel.c || fail 'PIT_HZ 50 missing'
+-grep -q '1193182u+(PIT_HZ/2u)' src/kernel.c || fail 'rounded PIT divisor missing'
+-grep -q 'n==32){timer_ticks++' src/kernel.c || fail 'IRQ0 counter path changed'
+-grep -q 'PIT(50Hz)' src/kernel.c || fail '50 Hz init banner missing'
++grep -q '#define RT_TIME_HZ 100u' src/kernel.c || fail '100 Hz RT timebase missing'
++grep -q '1193182u+(RT_TIME_HZ/2u)' src/kernel.c || fail 'rounded 100 Hz PIT divisor missing'
++grep -q 'rt_time_ticks++' src/kernel.c || fail 'RT time counter path missing'
++grep -q 'timer_ticks++' src/kernel.c || fail '50 Hz logical system counter missing'
++grep -q 'PIT(50Hz sys, 100Hz RT)' src/kernel.c || fail 'dual-rate init banner missing'
+ grep -q 'pit-test' src/user_shell.c || fail 'pit-test command missing'
+ grep -q 'waiting for 3 timer ticks' src/user_shell.c || fail 'pit-test wait missing'
+ grep -q 'SYS_TIMER_GET' src/user_shell.c || fail 'pit-test syscall path missing'
+@@ -19,8 +21,8 @@
+ python3 - <<'PY'
+ from pathlib import Path
+ s=Path('src/kernel.c').read_text()
+-assert 'static void pit_init(void){uint32_t div=(1193182u+(PIT_HZ/2u))/PIT_HZ;' in s
+-assert 'if(n==32){timer_ticks++;' in s
+-print('PASS: v33 PIT 50 Hz, IRQ0 counter, and unchanged queue ABI')
++assert 'static void pit_init(void){uint32_t div=(1193182u+(RT_TIME_HZ/2u))/RT_TIME_HZ;' in s
++assert 'if(n==32){rt_time_ticks++;rt_time_phase^=1u;' in s
++print('PASS: logical 50 Hz system timer preserved; 100 Hz RT timebase added')
+ PY
+ echo '=== CHECK33 PASS ==='
+diff -urN /tmp/toyos6base/check34.sh /tmp/toyos6/check34.sh
+--- /tmp/toyos6base/check34.sh	2026-09-13 12:03:42.000000000 +0000
++++ /tmp/toyos6/check34.sh	2026-09-18 14:17:24.314902144 +0000
+@@ -32,8 +32,8 @@
+ assert 'mem_copy(sched_tasks[sched_current].words,(const void*)f,MT_CONTEXT_WORDS*4u);' in k
+ assert 'uint32_t n=(sched_current+i)%SCHED_TASKS;' in k
+ assert 'mem_copy((void*)f,sched_tasks[sched_current].words,MT_CONTEXT_WORDS*4u);' in k
+-assert 'if(n==32){timer_ticks++;sched_irq_tick(f);}' in k
++assert 'if(n==32){rt_time_ticks++;rt_time_phase^=1u;if(rt_time_phase==0u)timer_ticks++;' in k and 'if(rt_background_active)sched_irq_tick(f);else if(rt_time_phase==0u)sched_irq_tick(f);' in k
+ assert 'void mt_task_a(void)' in u and 'void mt_task_b(void)' in u
+-print('PASS: v34/v35 context and CR3 coverage remains structurally covered; v37 adds scheduler states')
++print('PASS: scheduler context coverage remains; RT runs at 100 Hz while legacy system timer remains 50 Hz')
+ PY
+ echo '=== CHECK34 PASS ==='
+diff -urN /tmp/toyos6base/check_rtd_stage5_1.sh /tmp/toyos6/check_rtd_stage5_1.sh
+--- /tmp/toyos6base/check_rtd_stage5_1.sh	2026-09-18 13:57:13.000000000 +0000
++++ /tmp/toyos6/check_rtd_stage5_1.sh	2026-09-18 14:18:00.684086305 +0000
+@@ -11,7 +11,7 @@
+ grep -q 'rt_deadline_reached' src/kernel.c
+ grep -q 'rt_deadline_absolute' src/kernel.c
+ grep -q 'rt_begin_job' src/kernel.c
+-grep -Eq 'rt_job_release_tick=timer_ticks|rt_begin_job\(&sched_tasks\[id\],timer_ticks\)' src/kernel.c
++grep -Eq 'rt_job_release_tick=timer_ticks|rt_begin_job\(&sched_tasks\[id\],timer_ticks\)|rt_begin_job\(&sched_tasks\[id\],rt_time_ticks\)' src/kernel.c
+ grep -q 'case SYS_RT_DEADLINE_INFO' src/kernel.c
+ grep -q 'sched_tasks\[rid\].rt_job_release_tick' src/kernel.c
+ 
+diff -urN /tmp/toyos6base/check_rtd_stage6_1.sh /tmp/toyos6/check_rtd_stage6_1.sh
+--- /tmp/toyos6base/check_rtd_stage6_1.sh	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/check_rtd_stage6_1.sh	2026-09-18 14:18:51.805907998 +0000
+@@ -0,0 +1,58 @@
++#!/bin/sh
++set -eu
++fail(){ echo "FAIL: $1" >&2; exit 1; }
++
++test -f src/rt_deadline.h || fail 'rt deadline header missing'
++test -f src/rt_timebase_diag.c || fail 'RTTIME diagnostic source missing'
++test -f tools/test_rt_timebase.c || fail 'RT timebase host test missing'
++
++grep -q '#define PIT_HZ 50u' src/kernel.c || fail 'legacy 50 Hz system constant missing'
++grep -q '#define RT_TIME_HZ 100u' src/kernel.c || fail '100 Hz RT hardware timebase missing'
++grep -q 'static volatile uint32_t rt_time_ticks;' src/kernel.c || fail 'RT time counter missing'
++grep -q 'rt_time_phase' src/kernel.c || fail 'dual-rate phase divider missing'
++grep -q 'rt_time_ticks++;' src/kernel.c || fail 'RT tick increment missing'
++grep -q 'timer_ticks++;' src/kernel.c || fail 'legacy 50 Hz counter increment missing'
++grep -q 'if(rt_background_active)sched_irq_tick(f);else if(rt_time_phase==0u)sched_irq_tick(f);' src/kernel.c || fail 'dual-rate scheduler dispatch missing'
++grep -q 'case SYS_RT_TIME_GET:f->eax=rt_time_ticks;break;' src/kernel.c || fail 'RT time syscall missing'
++grep -q '#define SYS_RT_TIME_GET    45u' src/kernel.c || fail 'RT time syscall id missing'
++
++grep -q 'unsigned int q=ms/10u' src/rt_deadline.h || fail '10 ms RT conversion missing'
++grep -q 'rt_next_release_tick=rt_time_ticks' src/kernel.c || fail 'RT release no longer uses RT clock'
++grep -q 'rt_begin_job(&sched_tasks\[id\],rt_time_ticks)' src/kernel.c || fail 'RT job release no longer uses RT clock'
++grep -q 't=&sched_tasks\[id\];now=rt_time_ticks' src/kernel.c || fail 'SYS_RT_WAIT no longer uses RT clock'
++grep -q 'uint32_t now=rt_time_ticks' src/kernel.c || fail 'RT IRQ scheduler no longer uses RT clock'
++
++grep -q 'SYS_RT_TIME_GET' src/rtd.c || fail 'RTD delay is not using RT clock'
++grep -q 'delay_ms/10u' src/rtd.c || fail 'RTD delay conversion is not 10 ms based'
++grep -q 'RTTIME: started ordinary EXE1' src/rt_timebase_diag.c || fail 'RTTIME diagnostic banner missing'
++grep -q 'rt_delta=' src/rt_timebase_diag.c || fail 'RTTIME RT delta output missing'
++grep -q 'system_delta=' src/rt_timebase_diag.c || fail 'RTTIME legacy system delta output missing'
++
++grep -q 'RTTIME.EXE' build.sh || fail 'RTTIME EXE1 not in build'
++grep -q 'check_rtd_stage6_1.sh' build.sh || fail 'Stage 6.1 regression not in build'
++grep -q 'SYS_RT_TIME_GET=100 Hz / 10 ms RT clock' src/user_shell.c || fail 'shell RT clock documentation missing'
++
++grep -q 'PIT(50Hz sys, 100Hz RT)' src/kernel.c || fail 'dual-rate banner missing'
++
++grep -q 'Stage 6.1' README.md || fail 'README Stage 6.1 missing'
++grep -q 'changes/RTD/Stage6/Stage6_1' README.md || fail 'README Stage 6.1 docs path missing'
++
++grep -q 'Stage 6.1' changes/RTD/Stage6/Stage6_1/RELEASE_NOTES_RU.md || fail 'Stage 6.1 release notes missing'
++grep -q '100 Hz' changes/RTD/Stage6/Stage6_1/TEST_PLAN_RU.md || fail 'Stage 6.1 test plan missing 100 Hz'
++
++tmpdir=${TMPDIR:-/tmp}
++tmp="$tmpdir/toyos_rt_stage61_$$"
++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
++mkdir -p "$tmp"
++cc=${CC:-gcc}
++$cc -std=c99 -Wall -Wextra -Werror tools/test_rt_timebase.c -o "$tmp/test_rt_timebase"
++"$tmp/test_rt_timebase"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/kernel.c -o "$tmp/kernel.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/user_shell.c -o "$tmp/user_shell.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rtd.c -o "$tmp/rtd.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_timebase_diag.c -o "$tmp/rt_timebase_diag.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_sensor.c -o "$tmp/rt_sensor.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_deadline_diag.c -o "$tmp/rt_deadline_diag.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_deadline_miss_diag.c -o "$tmp/rt_deadline_miss_diag.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_period_skip_diag.c -o "$tmp/rt_period_skip_diag.o"
++echo 'RTD Stage 6.1 dual-rate timebase checks passed'
+diff -urN /tmp/toyos6base/src/kernel.c /tmp/toyos6/src/kernel.c
+--- /tmp/toyos6base/src/kernel.c	2026-09-18 13:56:04.000000000 +0000
++++ /tmp/toyos6/src/kernel.c	2026-09-18 14:18:00.683661202 +0000
+@@ -93,6 +93,7 @@
+ #define SYS_RT_DEADLINE_INFO 42u
+ #define SYS_RT_STATUS      43u
+ #define SYS_RT_JOB_INFO    44u
++#define SYS_RT_TIME_GET    45u
+ #define SCHED_TASKS      25u
+ #define EXECMT_MAX_TASKS 25u
+ #define RT_MAX_TASKS      4u
+@@ -654,6 +655,10 @@
+ struct frame{uint32_t edi,esi,ebp,oes,ebx,edx,ecx,eax;uint32_t gs,fs,es,ds;uint32_t int_no,error;uint32_t eip,cs,eflags;} __attribute__((packed));
+ static void sched_exit(struct frame*);
+ static volatile uint32_t timer_ticks;
++/* Stage 6.1: hardware PIT IRQ0 runs at 100 Hz for a real 10 ms RT timebase.
++   timer_ticks remains a logical 50 Hz system clock for legacy SYS_TIMER_GET. */
++static volatile uint32_t rt_time_ticks;
++static uint32_t rt_time_phase;
+ static volatile uint8_t ata_irq_seen;
+ static int disk_read(uint32_t,void*,uint32_t); static int disk_write(uint32_t,const void*,uint32_t);
+ static uint8_t keybuf[256];static volatile uint8_t khead,ktail;static uint8_t shift_state;
+@@ -695,7 +700,8 @@
+ static void irq_enable(uint8_t irq){uint16_t p=irq<8?PIC1+1:PIC2+1;uint8_t m=inb(p);if(irq<8)m&=(uint8_t)~(1u<<irq);else m&=(uint8_t)~(1u<<(irq-8));outb(p,m);}
+ static void irq_eoi(uint32_t n){if(n>=40)outb(PIC2,0x20);if(n>=32&&n<48)outb(PIC1,0x20);}
+ #define PIT_HZ 50u
+-static void pit_init(void){uint32_t div=(1193182u+(PIT_HZ/2u))/PIT_HZ;outb(0x43,0x36);outb(PIT,(uint8_t)div);outb(PIT,(uint8_t)(div>>8));}
++#define RT_TIME_HZ 100u
++static void pit_init(void){uint32_t div=(1193182u+(RT_TIME_HZ/2u))/RT_TIME_HZ;outb(0x43,0x36);outb(PIT,(uint8_t)div);outb(PIT,(uint8_t)(div>>8));}
+ 
+ static void keyboard_init(void){
+     uint32_t i;
+@@ -2002,11 +2008,11 @@
+     mem_copy(sched_tasks[id].name,name,QUEUE_NAME_SIZE);
+     sched_tasks[id].rt_period_ms=req.period_ms;sched_tasks[id].rt_deadline_ms=req.deadline_ms;sched_tasks[id].rt_priority=req.priority;
+     sched_tasks[id].rt_period_ticks=rt_deadline_ms_to_ticks(req.period_ms);
+-    sched_tasks[id].rt_next_release_tick=timer_ticks;
++    sched_tasks[id].rt_next_release_tick=rt_time_ticks;
+     sched_tasks[id].rt_job_sequence=0u;
+     sched_tasks[id].rt_skipped_releases=0u;
+     sched_tasks[id].rt_missed_deadlines=0u;
+-    rt_begin_job(&sched_tasks[id],timer_ticks);
++    rt_begin_job(&sched_tasks[id],rt_time_ticks);
+     sched_tasks[id].rt_runtime_budget=1u+
+         (sched_tasks[id].rt_period_ticks/255u)*req.priority+
+         ((sched_tasks[id].rt_period_ticks%255u)*req.priority)/255u;
+@@ -2015,7 +2021,7 @@
+     sched_tasks[id].rt_runtime_ticks=0u;sched_tasks[id].rt_dispatch_seq=0u;sched_tasks[id].state=TASK_READY;
+     rt_stop_requested&=~(1u<<id);rt_recount_active();
+     if(rt_task_count==1u){
+-        rt_task_id=id;rt_started_tick=timer_ticks;sched_saved_shell_cr3=read_cr3();
++        rt_task_id=id;rt_started_tick=rt_time_ticks;sched_saved_shell_cr3=read_cr3();
+         mem_copy(rt_shell_frame,saved_user_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_shell_waiting=0u;rt_shell_hold=0u;
+     }
+     return EXE_OK;
+@@ -2046,7 +2052,7 @@
+ static void rt_wait(struct frame*f){
+     int id=rt_find_current();uint32_t now,next,dt;struct sched_task*t;
+     if(id<0||(f->cs&3u)==0u){f->eax=0xffffffffu;return;}
+-    t=&sched_tasks[id];now=timer_ticks;
++    t=&sched_tasks[id];now=rt_time_ticks;
+     if(!t->rt_job_active){f->eax=0;return;}
+     if(t->rt_job_missed||rt_deadline_reached(now,t->rt_deadline_tick)){
+         if(!t->rt_job_missed)t->rt_missed_deadlines++;
+@@ -2188,7 +2194,7 @@
+     int next;
+     if(!sched_active&&!rt_background_active)return;
+     if(rt_background_active&&!sched_active){
+-        uint32_t now=timer_ticks;
++        uint32_t now=rt_time_ticks;
+         int current;
+         rt_release_jobs(now);
+         current=rt_find_current();
+@@ -2291,7 +2297,7 @@
+     f->eax=0;
+     sched_dispatch_next(f);
+ }
+-void interrupt_dispatch(struct frame*f){uint32_t n=f->int_no;if(n==32){timer_ticks++;sched_irq_tick(f);}else if(n==33)keyboard_irq();else if(n==46)ata_irq();else if(n<32){
++void interrupt_dispatch(struct frame*f){uint32_t n=f->int_no;if(n==32){rt_time_ticks++;rt_time_phase^=1u;if(rt_time_phase==0u)timer_ticks++;if(rt_background_active)sched_irq_tick(f);else if(rt_time_phase==0u)sched_irq_tick(f);}else if(n==33)keyboard_irq();else if(n==46)ata_irq();else if(n<32){
+         /* При аварийном исключении печатаем номер, EIP, CS и error code.
+            Для #PF дополнительно печатаем CR2 — адрес, вызвавший fault. */
+         console_write("EXC ");console_write_u32(n);
+@@ -2305,7 +2311,7 @@
+         case SYS_CONSOLE_WRITE:if((f->cs&3u)&&!user_range(a,b)){f->eax=0xffffffffu;break;}f->eax=(b&&a)?console_write_atomic_n((const char*)a,b):0;break;
+         case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch==KEY_EVENT_F10){rt_shell_waiting=0;rt_shell_hold=0u;f->eax=4u;break;}if(ch){rt_shell_waiting=0;rt_shell_hold=0u;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){if(rt_shell_hold){rt_shell_hold=0u;__asm__ volatile("sti;hlt;cli":::"memory");continue;}int rid=rt_pick_ready();if(rid>=0){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_task_id=(uint32_t)rid;sched_tasks[rid].state=TASK_RUNNING;sched_tasks[rid].switches++;rt_record_dispatch(rid);load_cr3(sched_tasks[rid].cr3);mem_copy((void*)f,sched_tasks[rid].words,MT_CONTEXT_WORDS*4u);break;}}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
+         case SYS_CONSOLE_POLL:{uint8_t ch=0;{int rid=rt_find_current();if(rid>=0){/* Detached RT owns only the explicit ESC stop event. All other keyboard bytes stay in the shell queue so interactive shell input cannot be consumed by SENSOR. */if(rt_stop_requested&(1u<<rid))ch=0x1bu;}else ch=key_pop();}if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
+-        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_JOB_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,36u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_job_sequence;((uint32_t*)a)[1]=sched_tasks[rid].rt_job_release_tick;((uint32_t*)a)[2]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[3]=timer_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_missed;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;((uint32_t*)a)[8]=sched_tasks[rid].rt_skipped_releases;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_TRACE:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=(uint32_t)rid;((uint32_t*)a)[1]=sched_tasks[rid].rt_priority;((uint32_t*)a)[2]=sched_tasks[rid].switches;((uint32_t*)a)[3]=sched_tasks[rid].rt_dispatch_seq;((uint32_t*)a)[4]=sched_tasks[rid].state;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_DEADLINE_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_job_release_tick;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[2]=timer_ticks;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
++        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_TIME_GET:f->eax=rt_time_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_JOB_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,36u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_job_sequence;((uint32_t*)a)[1]=sched_tasks[rid].rt_job_release_tick;((uint32_t*)a)[2]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[3]=rt_time_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_missed;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;((uint32_t*)a)[8]=sched_tasks[rid].rt_skipped_releases;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_TRACE:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=(uint32_t)rid;((uint32_t*)a)[1]=sched_tasks[rid].rt_priority;((uint32_t*)a)[2]=sched_tasks[rid].switches;((uint32_t*)a)[3]=sched_tasks[rid].rt_dispatch_seq;((uint32_t*)a)[4]=sched_tasks[rid].state;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_DEADLINE_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_job_release_tick;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[2]=rt_time_ticks;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
+         case SYS_DISK_READ:if((f->cs&3u)&&(c>8u||!user_rw_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_read(a,(void*)b,c)?0:0xffffffffu;break;
+         case SYS_DISK_WRITE:if((f->cs&3u)&&(c>8u||!user_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_write(a,(const void*)b,c)?0:0xffffffffu;break;
+         case SYS_FILE_OPEN:if((f->cs&3u)&&!user_cstr(a)){f->eax=0xffffffffu;break;}f->eax=(uint32_t)fat_open((const char*)a,b);break;
+@@ -2407,7 +2413,7 @@
+     console_clear();
+     console_write("Toy OS kernel\nRAM: ");
+     u32_dec(mem,b);console_write(b);console_write(" bytes\n");
+-    console_write("IDT/PIC/PIT(50Hz)/KBD/ATA/FAT16 init...\n");
++    console_write("IDT/PIC/PIT(50Hz sys, 100Hz RT)/KBD/ATA/FAT16 init...\n");
+ 
+     idt_init();
+     gdt_init_ring3();
+diff -urN /tmp/toyos6base/src/rt_deadline.h /tmp/toyos6/src/rt_deadline.h
+--- /tmp/toyos6base/src/rt_deadline.h	2026-09-18 13:56:04.000000000 +0000
++++ /tmp/toyos6/src/rt_deadline.h	2026-09-18 14:20:12.822790523 +0000
+@@ -1,21 +1,22 @@
+ #ifndef TOYOS_RT_DEADLINE_H
+ #define TOYOS_RT_DEADLINE_H
+ 
+-/* Stage 5.1: absolute RT job timing on the existing 50 Hz PIT. */
++/* Stage 6.1: RT job timing uses the hardware PIT 100 Hz timebase.
++   One RT tick is 10 ms. Legacy SYS_TIMER_GET remains a separate 50 Hz clock. */
+ static inline unsigned int rt_deadline_ms_to_ticks(unsigned int ms){
+-    unsigned int q=ms/20u;
+-    if(ms%20u)q++;
++    unsigned int q=ms/10u;
++    if(ms%10u)q++;
+     return q?q:1u;
+ }
+ 
+-/* A deadline is reached at or after target in modulo-2^32 timer space.
++/* A deadline is reached at or after target in modulo-2^32 RT time space.
+    The comparison is valid for the normal RT interval, which is below
+    2^31 ticks. This also handles timer wrap without using signed overflow. */
+ static inline int rt_deadline_reached(unsigned int now,unsigned int target){
+     return (unsigned int)(now-target)<0x80000000u;
+ }
+ 
+-/* Stage 5.2 FIX1: wrap-safe ordering of two absolute timer values.
++/* Stage 5.2 FIX1: wrap-safe ordering of two absolute RT time values.
+    Returns non-zero when a is strictly before b in modulo-2^32 time, provided
+    the compared interval stays below 2^31 ticks (the same bounded interval
+    required by rt_deadline_reached()). */
+diff -urN /tmp/toyos6base/src/rt_deadline_diag.c /tmp/toyos6/src/rt_deadline_diag.c
+--- /tmp/toyos6base/src/rt_deadline_diag.c	2026-09-18 12:25:59.000000000 +0000
++++ /tmp/toyos6/src/rt_deadline_diag.c	2026-09-18 14:16:31.560599717 +0000
+@@ -1,12 +1,13 @@
+ /* DEADLINE.EXE - Stage 5.1 absolute-deadline diagnostic EXE1.
+  * It is an ordinary ToyOS EXE1 program.  The kernel creates one RT job with
+  * an absolute release tick and deadline tick; this program prints both while
+- * the current job is active so the deadline can be checked against timer_ticks.
++ * the current job is active so the deadline can be checked against rt_time_ticks.
+  */
+ typedef unsigned int uint32_t;
+ typedef unsigned char uint8_t;
+ #define SYS_CONSOLE_WRITE 1u
+ #define SYS_TIMER_GET     3u
++#define SYS_RT_TIME_GET  45u
+ #define SYS_CONSOLE_POLL 37u
+ #define SYS_RT_INFO      39u
+ #define SYS_RT_WAIT      40u
+@@ -15,7 +16,7 @@
+ static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
+ static void put(const char*s){uint32_t n=0u;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+ static void put_u32(uint32_t v){char b[12];uint32_t i=0u,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
+-static uint32_t timer_wait_change(uint32_t start){uint32_t now=start;while(now==start)now=sc(SYS_TIMER_GET,0,0,0);return now;}
++static uint32_t timer_wait_change(uint32_t start){uint32_t now=start;while(now==start)now=sc(SYS_RT_TIME_GET,0,0,0);return now;}
+ __attribute__((section(".usertext"))) void program_main(void){
+     uint32_t info[5],now,release,deadline,waits=0u;uint8_t key=0u;
+     if(sc(SYS_RT_DEADLINE_INFO,(uint32_t)info,0,0)!=0u){put("DEADLINE: info FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}
+diff -urN /tmp/toyos6base/src/rt_deadline_miss_diag.c /tmp/toyos6/src/rt_deadline_miss_diag.c
+--- /tmp/toyos6base/src/rt_deadline_miss_diag.c	2026-09-18 13:06:26.000000000 +0000
++++ /tmp/toyos6/src/rt_deadline_miss_diag.c	2026-09-18 14:16:31.560681687 +0000
+@@ -8,6 +8,7 @@
+ typedef unsigned char uint8_t;
+ #define SYS_CONSOLE_WRITE 1u
+ #define SYS_TIMER_GET     3u
++#define SYS_RT_TIME_GET  45u
+ #define SYS_CONSOLE_POLL 37u
+ #define SYS_RT_WAIT      40u
+ #define SYS_RT_DEADLINE_INFO 42u
+@@ -16,7 +17,7 @@
+ static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
+ static void put(const char*s){uint32_t n=0u;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+ static void put_u32(uint32_t v){char b[12];uint32_t i=0u,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
+-static uint32_t next_tick(uint32_t start){uint32_t now=start;while(now==start)now=sc(SYS_TIMER_GET,0,0,0);return now;}
++static uint32_t next_tick(uint32_t start){uint32_t now=start;while(now==start)now=sc(SYS_RT_TIME_GET,0,0,0);return now;}
+ static void trace(void){uint32_t t[5];if(sc(SYS_RT_TRACE,(uint32_t)t,0,0)!=0u)return;put("RTDMISS: dispatch=");put_u32(t[3]);put(" slot=");put_u32(t[0]);put(" priority=");put_u32(t[1]);put(" switches=");put_u32(t[2]);put("\n");}
+ __attribute__((section(".usertext"))) void program_main(void){
+     uint32_t info[5],now,loops=0u;uint8_t key=0u;uint32_t saw_miss=0u;
+diff -urN /tmp/toyos6base/src/rt_period_skip_diag.c /tmp/toyos6/src/rt_period_skip_diag.c
+--- /tmp/toyos6base/src/rt_period_skip_diag.c	2026-09-18 13:56:05.000000000 +0000
++++ /tmp/toyos6/src/rt_period_skip_diag.c	2026-09-18 14:17:24.314963015 +0000
+@@ -7,6 +7,7 @@
+ typedef unsigned char uint8_t;
+ #define SYS_CONSOLE_WRITE 1u
+ #define SYS_TIMER_GET     3u
++#define SYS_RT_TIME_GET  45u
+ #define SYS_CONSOLE_POLL 37u
+ #define SYS_RT_WAIT      40u
+ #define SYS_RT_JOB_INFO  44u
+@@ -14,7 +15,7 @@
+ static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
+ static void put(const char*s){uint32_t n=0u;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+ static void put_u32(uint32_t v){char b[12];uint32_t i=0u,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
+-static uint32_t next_tick(uint32_t start){uint32_t now=start;while(now==start)now=sc(SYS_TIMER_GET,0,0,0);return now;}
++static uint32_t next_tick(uint32_t start){uint32_t now=start;while(now==start)now=sc(SYS_RT_TIME_GET,0,0,0);return now;}
+ static void print_info(const char*tag){uint32_t v[9];if(sc(SYS_RT_JOB_INFO,(uint32_t)v,0,0)!=0u){put("RTDSKIP: info FAIL\n");return;}put("RTDSKIP: ");put(tag);put(" job=");put_u32(v[0]);put(" release=");put_u32(v[1]);put(" deadline=");put_u32(v[2]);put(" now=");put_u32(v[3]);put(" next=");put_u32(v[4]);put(" active=");put_u32(v[5]);put(" missed=");put_u32(v[6]);put(" deadline_misses=");put_u32(v[7]);put(" skipped=");put_u32(v[8]);put("\n");}
+ __attribute__((section(".usertext"))) void program_main(void){
+     uint32_t info[9],now,loops,wait_result;uint8_t key=0u;
+@@ -22,9 +23,9 @@
+     print_info("start");
+     for(;;){
+         if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("RTDSKIP: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
+-        now=sc(SYS_TIMER_GET,0,0,0);loops=0u;
++        now=sc(SYS_RT_TIME_GET,0,0,0);loops=0u;
+         /* Run for several release periods. With period=20ms this is five
+-           timer ticks, so at least several nominal releases become stale. */
++           RT ticks (50ms), so at least several nominal releases become stale. */
+         while(loops<5u){now=next_tick(now);loops++;}
+         print_info("before-wait");
+         wait_result=sc(SYS_RT_WAIT,0,0,0);
+diff -urN /tmp/toyos6base/src/rt_timebase_diag.c /tmp/toyos6/src/rt_timebase_diag.c
+--- /tmp/toyos6base/src/rt_timebase_diag.c	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/src/rt_timebase_diag.c	2026-09-18 14:16:31.561303324 +0000
+@@ -0,0 +1,32 @@
++/* RTTIME.EXE - Stage 6.1 RT timebase diagnostic EXE1.
++ * Ordinary ToyOS EXE1. Verifies the dedicated 10 ms RT timebase while the
++ * legacy SYS_TIMER_GET clock remains 20 ms per tick. */
++typedef unsigned int uint32_t;
++typedef unsigned char uint8_t;
++#define SYS_CONSOLE_WRITE 1u
++#define SYS_TIMER_GET 3u
++#define SYS_CONSOLE_POLL 37u
++#define SYS_RT_TIME_GET 45u
++#define SYS_EXIT 12u
++static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
++static void put(const char*s){uint32_t n=0;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
++static void put_u32(uint32_t v){char b[12];uint32_t i=0,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
++static uint32_t wait_rt_change(uint32_t base){uint32_t now;do{now=sc(SYS_RT_TIME_GET,0,0,0);}while(now==base);return now;}
++__attribute__((section(".usertext"))) void program_main(void){
++    uint32_t rt0=sc(SYS_RT_TIME_GET,0,0,0),sy0=sc(SYS_TIMER_GET,0,0,0),rt,sy,i;uint8_t key=0u;
++    put("RTTIME: started ordinary EXE1 (ESC to stop) RT=100Hz/10ms SYSTEM=50Hz/20ms\n");
++    for(i=0u;i<12u;i++){
++        if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("RTTIME: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
++        rt=wait_rt_change(rt0);sy=sc(SYS_TIMER_GET,0,0,0);
++        put("RTTIME: rt_delta=");put_u32(rt-rt0);put(" system_delta=");put_u32(sy-sy0);put(" rt=");put_u32(rt);put(" system=");put_u32(sy);put("\n");
++        rt0=rt;sy0=sy;
++    }
++    put("RTTIME: 12 RT ticks observed; expected 12 RT ticks and about 6 system ticks\n");
++    sc(SYS_EXIT,0,0,0);for(;;){}
++}
++__asm__(
++".section .start,\"ax\"\n"
++".global _start\n"
++"_start:\n"
++"jmp _program_main\n"
++);
+diff -urN /tmp/toyos6base/src/rtd.c /tmp/toyos6/src/rtd.c
+--- /tmp/toyos6base/src/rtd.c	2026-09-18 13:28:14.000000000 +0000
++++ /tmp/toyos6/src/rtd.c	2026-09-18 14:16:31.560429059 +0000
+@@ -13,6 +13,7 @@
+ 
+ #define SYS_CONSOLE_WRITE 1u
+ #define SYS_TIMER_GET     3u
++#define SYS_RT_TIME_GET  45u
+ #define SYS_EXIT          12u
+ #define SYS_EXEC_ARG      34u
+ #define SYS_RT_START      38u
+@@ -84,8 +85,8 @@
+         for(;;){}
+     }
+     if(delay_ms){
+-        uint32_t t0=syscall3(SYS_TIMER_GET,0,0,0),now;
+-        do { now=syscall3(SYS_TIMER_GET,0,0,0); } while((now-t0) < (delay_ms/20u + ((delay_ms%20u)!=0u)));
++        uint32_t t0=syscall3(SYS_RT_TIME_GET,0,0,0),now;
++        do { now=syscall3(SYS_RT_TIME_GET,0,0,0); } while((now-t0) < (delay_ms/10u + ((delay_ms%10u)!=0u)));
+     }
+     r=syscall3(SYS_RT_START,(uint32_t)&req,0,0);
+     if(r!=0u){
+diff -urN /tmp/toyos6base/src/user_shell.c /tmp/toyos6/src/user_shell.c
+--- /tmp/toyos6base/src/user_shell.c	2026-09-18 10:30:25.000000000 +0000
++++ /tmp/toyos6/src/user_shell.c	2026-09-18 14:16:31.560144625 +0000
+@@ -39,6 +39,7 @@
+ #define SYS_RT_START       38u
+ #define SYS_RT_INFO        39u
+ #define SYS_RT_TRACE       41u
++#define SYS_RT_TIME_GET    45u
+ #define SYS_VIDEO_TEXT     35u
+ #define SYS_CONSOLE_AT     36u
+ #define SYS_CONSOLE_POLL   37u
+@@ -68,6 +69,7 @@
+ __attribute__((section(".usertext"))) static uint32_t sys_console_write(const char*s,uint32_t n){return syscall3(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+ __attribute__((section(".usertext"))) static uint32_t sys_console_read(char*b,uint32_t n){return syscall3(SYS_CONSOLE_READ,(uint32_t)b,n,0);}
+ __attribute__((section(".usertext"))) static uint32_t sys_timer_get(void){return syscall3(SYS_TIMER_GET,0,0,0);}
++__attribute__((section(".usertext"))) static uint32_t sys_rt_time_get(void){return syscall3(SYS_RT_TIME_GET,0,0,0);}
+ __attribute__((section(".usertext"))) static uint32_t sys_disk_read(uint32_t lba,void*b,uint32_t n){return syscall3(SYS_DISK_READ,lba,(uint32_t)b,n);}
+ __attribute__((section(".usertext"))) static uint32_t sys_disk_write(uint32_t lba,const void*b,uint32_t n){return syscall3(SYS_DISK_WRITE,lba,(uint32_t)b,n);}
+ __attribute__((section(".usertext"))) static uint32_t sys_file_open(const char*name,uint32_t mode){return syscall3(SYS_FILE_OPEN,(uint32_t)name,mode,0);}
+@@ -144,6 +146,7 @@
+         put("  exec NETDRV.EXE TELEMETRY MASTER|SLAVE1|SLAVE2 ARG\n");
+         put("  exec VGADRV.EXE FILE    display 320x200 VGA image; any key returns to text mode\n");
+         put("  exec RTD.EXE SENSOR.EXE PERIOD DEADLINE PRIORITY [DELAY] queue RT task; F10 starts queued task(s)\n");
++        put("  RT timebase: SYS_TIMER_GET=50 Hz system clock; SYS_RT_TIME_GET=100 Hz / 10 ms RT clock\n");
+         put("  execmt FILE1.EXE [FILE2.EXE ... FILE25.EXE]\n");
+         put("  execq REPEAT FILE1 [FILE2 ... FILE25]\n");
+         put("  execq forever FILE1 [FILE2 ... FILE25]\n");
+@@ -330,7 +333,7 @@
+     pending_rt_count=count-launched;
+ }
+ __attribute__((section(".usertext"))) static void exec_file(const char*name){uint32_t r=sys_exec(name);if(r==0)return;put("exec: FAIL ");if(r==0xffffffffu)put("-1\n");else{char b[12];dec(r,b);put(b);put("\n");}}
+-__attribute__((section(".usertext"))) static void do_syscall(char*p){uint32_t n,a,b,r;char out[12];skip(&p);n=number(&p);skip(&p);if(n==SYS_CONSOLE_WRITE){r=sys_console_write(p,sl(p));put("\nsyscall 1 -> ");dec(r,out);put(out);put(" bytes\n");return;}if(n==SYS_TIMER_GET){r=sys_timer_get();put("\nsyscall 3 -> ");dec(r,out);put(out);put(" ticks\n");return;}if(n==SYS_MT_STOP){r=sys_mt_stop();put("\nsyscall 19 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_MT_START){r=sys_mt_start();put("\nsyscall 18 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_BLOCK){r=sys_sched_block();put("\nsyscall 20 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_WAKE){if(!*p){put("\nsyscall 21: usage syscall 21 TASK_ID\n");return;}a=number(&p);r=sys_sched_wake(a);put("\nsyscall 21 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_EXIT){r=sys_sched_exit();put("\nsyscall 22 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_CONSOLE_READ){put("syscall 2: type one character> ");{char x;put("\n");r=sys_console_read(&x,1);if(r==0xffffffffu){put("read=FAIL\n");return;}if(r==1){put("\nread=\"");putn(&x,1);put("\"\n");}else put("\nread=\"\n");}return;}if(n==SYS_PORT_OUT8){if(!*p){put("\nsyscall 13: usage syscall 13 PORT VALUE\n");return;}a=number(&p);skip(&p);if(!*p){put("\nsyscall 13: usage syscall 13 PORT VALUE\n");return;}b=number(&p);if(a>0xffffu||b>0xffu){put("\nsyscall 13: invalid port/value\n");return;}r=sys_port_out8(a,b);put("\nsyscall 13 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_PORT_IN8){if(!*p){put("\nsyscall 14: usage syscall 14 PORT\n");return;}a=number(&p);if(a>0xffffu){put("\nsyscall 14: invalid port\n");return;}r=sys_port_in8(a);if(r==0xffffffffu){put("\nsyscall 14 -> FAIL\n");return;}hex8(r,out);put("\nsyscall 14 -> 0x");put(out);put(" (");dec(r,out);put(out);put(")\n");return;}if(n==SYS_QUEUE_STOP){r=sys_queue_stop();put("\nsyscall 16 -> ");put(r==0?"requested\n":"no active queue\n");return;}if(n==SYS_FILE_SIZE){skip(&p);if(!*p){put("\nsyscall 17: usage syscall 17 FILE\n");return;}r=sys_file_size(p);put("\nsyscall 17 -> ");if(r==0xffffffffu)put("FAIL\n");else{dec(r,out);put(out);put(" bytes\n");}return;}if(n==SYS_EXECMT){put("syscall 23 is intended for execmt; use: execmt FILE1 ... FILE25\n");return;}if(n==SYS_EXEC_QUEUE){put("syscall 15 is intended for execq; use: execq REPEAT FILE1 ... FILE25\n");return;}if(n==SYS_CHDIR){if(!*p){put("\nsyscall 29: usage syscall 29 PATH\n");return;}r=sys_chdir(p);put("\nsyscall 29 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_GETCWD){char cwd[128];r=sys_getcwd(cwd,sizeof(cwd));put("\nsyscall 30 -> ");if(r==0xffffffffu)put("FAIL\n");else{put(cwd);put("\n");}return;}put("\nsyscall: unsupported number\n");}
++__attribute__((section(".usertext"))) static void do_syscall(char*p){uint32_t n,a,b,r;char out[12];skip(&p);n=number(&p);skip(&p);if(n==SYS_CONSOLE_WRITE){r=sys_console_write(p,sl(p));put("\nsyscall 1 -> ");dec(r,out);put(out);put(" bytes\n");return;}if(n==SYS_TIMER_GET){r=sys_timer_get();put("\nsyscall 3 -> ");dec(r,out);put(out);put(" ticks (50 Hz system)\n");return;}if(n==SYS_RT_TIME_GET){r=sys_rt_time_get();put("\nsyscall 45 -> ");dec(r,out);put(out);put(" ticks (100 Hz RT, 10 ms)\n");return;}if(n==SYS_MT_STOP){r=sys_mt_stop();put("\nsyscall 19 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_MT_START){r=sys_mt_start();put("\nsyscall 18 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_BLOCK){r=sys_sched_block();put("\nsyscall 20 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_WAKE){if(!*p){put("\nsyscall 21: usage syscall 21 TASK_ID\n");return;}a=number(&p);r=sys_sched_wake(a);put("\nsyscall 21 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_EXIT){r=sys_sched_exit();put("\nsyscall 22 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_CONSOLE_READ){put("syscall 2: type one character> ");{char x;put("\n");r=sys_console_read(&x,1);if(r==0xffffffffu){put("read=FAIL\n");return;}if(r==1){put("\nread=\"");putn(&x,1);put("\"\n");}else put("\nread=\"\n");}return;}if(n==SYS_PORT_OUT8){if(!*p){put("\nsyscall 13: usage syscall 13 PORT VALUE\n");return;}a=number(&p);skip(&p);if(!*p){put("\nsyscall 13: usage syscall 13 PORT VALUE\n");return;}b=number(&p);if(a>0xffffu||b>0xffu){put("\nsyscall 13: invalid port/value\n");return;}r=sys_port_out8(a,b);put("\nsyscall 13 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_PORT_IN8){if(!*p){put("\nsyscall 14: usage syscall 14 PORT\n");return;}a=number(&p);if(a>0xffffu){put("\nsyscall 14: invalid port\n");return;}r=sys_port_in8(a);if(r==0xffffffffu){put("\nsyscall 14 -> FAIL\n");return;}hex8(r,out);put("\nsyscall 14 -> 0x");put(out);put(" (");dec(r,out);put(out);put(")\n");return;}if(n==SYS_QUEUE_STOP){r=sys_queue_stop();put("\nsyscall 16 -> ");put(r==0?"requested\n":"no active queue\n");return;}if(n==SYS_FILE_SIZE){skip(&p);if(!*p){put("\nsyscall 17: usage syscall 17 FILE\n");return;}r=sys_file_size(p);put("\nsyscall 17 -> ");if(r==0xffffffffu)put("FAIL\n");else{dec(r,out);put(out);put(" bytes\n");}return;}if(n==SYS_EXECMT){put("syscall 23 is intended for execmt; use: execmt FILE1 ... FILE25\n");return;}if(n==SYS_EXEC_QUEUE){put("syscall 15 is intended for execq; use: execq REPEAT FILE1 ... FILE25\n");return;}if(n==SYS_CHDIR){if(!*p){put("\nsyscall 29: usage syscall 29 PATH\n");return;}r=sys_chdir(p);put("\nsyscall 29 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_GETCWD){char cwd[128];r=sys_getcwd(cwd,sizeof(cwd));put("\nsyscall 30 -> ");if(r==0xffffffffu)put("FAIL\n");else{put(cwd);put("\n");}return;}put("\nsyscall: unsupported number\n");}
+ 
+ /* v38: four independent Ring-3 tasks.  The scheduler demonstrates the full
+    lifecycle CREATE -> READY -> RUNNING -> BLOCKED/STOPPED -> EXIT. */
+diff -urN /tmp/toyos6base/tools/test_rt_deadline.c /tmp/toyos6/tools/test_rt_deadline.c
+--- /tmp/toyos6base/tools/test_rt_deadline.c	2026-09-18 12:11:24.000000000 +0000
++++ /tmp/toyos6/tools/test_rt_deadline.c	2026-09-18 14:17:24.314431867 +0000
+@@ -7,12 +7,12 @@
+ int main(void){
+     int r;
+ 
+-    /* 50 Hz PIT: ceil(ms / 20), with a one-tick minimum. */
++    /* Stage 6.1 RT clock: 100 Hz, ceil(ms / 10), with a one-tick minimum. */
+     r=expect_u(rt_deadline_ms_to_ticks(1u),1u,1); if(r)return r;
+-    r=expect_u(rt_deadline_ms_to_ticks(20u),1u,2); if(r)return r;
+-    r=expect_u(rt_deadline_ms_to_ticks(21u),2u,3); if(r)return r;
+-    r=expect_u(rt_deadline_ms_to_ticks(100u),5u,4); if(r)return r;
+-    r=expect_u(rt_deadline_ms_to_ticks(UINT_MAX),214748365u,5); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(10u),1u,2); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(20u),2u,3); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(100u),10u,4); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(UINT_MAX),429496730u,5); if(r)return r;
+ 
+     /* Absolute deadline = release + deadline interval, independent of
+        dispatch time. */
+diff -urN /tmp/toyos6base/tools/test_rt_timebase.c /tmp/toyos6/tools/test_rt_timebase.c
+--- /tmp/toyos6base/tools/test_rt_timebase.c	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos6/tools/test_rt_timebase.c	2026-09-18 14:18:34.674266592 +0000
+@@ -0,0 +1,30 @@
++#include <limits.h>
++#include <stdio.h>
++#include "../src/rt_deadline.h"
++
++static int expect_u(unsigned int got,unsigned int want,int code){return got==want?0:code;}
++
++int main(void){
++    unsigned int rt=0u,sys=0u,phase=0u,i;
++    int r;
++    /* Stage 6.1: 100 Hz RT clock -> 10 ms per RT tick. */
++    r=expect_u(rt_deadline_ms_to_ticks(1u),1u,1); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(10u),1u,2); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(11u),2u,3); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(20u),2u,4); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(40u),4u,5); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(100u),10u,6); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(UINT_MAX),429496730u,7); if(r)return r;
++
++    /* Ten hardware RT ticks are five logical system ticks: 100 Hz hardware,
++       50 Hz legacy SYS_TIMER_GET. */
++    for(i=0u;i<10u;i++){
++        rt++;
++        phase^=1u;
++        if(phase==0u)sys++;
++    }
++    r=expect_u(rt,10u,8); if(r)return r;
++    r=expect_u(sys,5u,9); if(r)return r;
++    puts("RTD Stage 6.1 dual-rate timebase model passed");
++    return 0;
++}

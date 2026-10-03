@@ -1,0 +1,343 @@
+diff -ruN ./RELEASE_NOTES_V67_RTD_STAGE2_RU.md /tmp/toyos_work/RELEASE_NOTES_V67_RTD_STAGE2_RU.md
+--- ./RELEASE_NOTES_V67_RTD_STAGE2_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos_work/RELEASE_NOTES_V67_RTD_STAGE2_RU.md	2026-09-17 16:03:40.712519343 +0000
+@@ -0,0 +1,23 @@
++# ToyOS v67 — RT Stage 2
++
++## Реальное применение period/deadline/priority
++
++Зафиксирован рабочий RTD Stage 1/FIX7. Механизм завершения SENSOR/ESC не изменён.
++
++Добавлен следующий изолированный этап RT-планирования:
++
++- `period_ms` преобразуется в системные тики PIT 50 Hz (`ceil(ms/20)`);
++- периодическая задача получает абсолютное время следующего release;
++- `deadline_ms` формирует абсолютный deadline каждой job;
++- пропущенный deadline учитывается в `rt_missed_deadlines`, а просроченная job снимается до следующего release;
++- `SYS_RT_WAIT` завершает текущую периодическую job и блокирует SENSOR до следующего release;
++- `priority` реально участвует в планировании через максимально разрешённый runtime budget внутри периода;
++- budget рассчитывается без переполнения uint32;
++- `SYS_RT_INFO` расширен диагностикой scheduler state;
++- ESC и существующий механизм возврата в shell не изменены.
++
++### Важное ограничение
++
++PIT остаётся 50 Hz, поэтому scheduler имеет квант 20 ms. Запрос 10 ms не создаёт физический 10-ms interrupt; это сознательно не менялось на данном этапе, чтобы сохранить существующую временную модель ToyOS.
++
++Stage 2 не заявляет SMP или hard real-time guarantees. Это детерминированная периодическая модель поверх существующего i386/PIT scheduler.
+diff -ruN ./TEST_PLAN_V67_RTD_STAGE2_RU.md /tmp/toyos_work/TEST_PLAN_V67_RTD_STAGE2_RU.md
+--- ./TEST_PLAN_V67_RTD_STAGE2_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos_work/TEST_PLAN_V67_RTD_STAGE2_RU.md	2026-09-17 16:03:40.712622973 +0000
+@@ -0,0 +1,21 @@
++# ToyOS v67 — тест-план RT Stage 2
++
++## Статические тесты
++
++`check_rtd_stage2.sh` проверяет наличие RT_WAIT, release/deadline state, deadline accounting, priority budget и overflow-safe расчёт.
++
++## Сборка
++
++Обязательно компилируются `kernel.c`, `user_shell.c`, `rtd.c`, `rt_sensor.c` в 32-bit freestanding режиме.
++
++## Runtime acceptance
++
++1. `exec RTD.EXE SENSOR.EXE 20 20 3` — SENSOR печатает один job/tick на период и после каждого job вызывает RT_WAIT.
++2. `exec RTD.EXE SENSOR.EXE 40 40 3` — интервалы job примерно 40 ms (2 PIT ticks).
++3. `exec RTD.EXE SENSOR.EXE 100 100 3` — примерно 100 ms (5 PIT ticks).
++4. `exec RTD.EXE SENSOR.EXE 20 20 255` — высокий priority получает максимально разрешённый budget; для SENSOR, завершающего job через RT_WAIT, результат остаётся периодическим.
++5. `exec RTD.EXE SENSOR.EXE 20 1 3` — команда должна быть отвергнута существующей валидацией `deadline <= period`.
++6. Нагрузка/искусственная job, не вызывающая RT_WAIT до deadline, должна привести к `deadline miss` и переходу к следующему release.
++7. ESC во время ожидания SENSOR не должен ломать существующий механизм завершения и shell prompt.
++
++PIT 50 Hz сохраняется; hard 10-ms scheduling на этом этапе не заявляется.
+diff -ruN ./build.sh /tmp/toyos_work/build.sh
+--- ./build.sh	2026-09-17 15:55:15.000000000 +0000
++++ /tmp/toyos_work/build.sh	2026-09-17 16:03:40.712248749 +0000
+@@ -331,6 +331,7 @@
+ sh ./check_rtd_stage1.sh
+ sh ./check_rtd_stage1_fix3.sh
+ sh ./check_rtd_stage1_fix6.sh
++sh ./check_rtd_stage2.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+diff -ruN ./check_rtd_stage2.sh /tmp/toyos_work/check_rtd_stage2.sh
+--- ./check_rtd_stage2.sh	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/toyos_work/check_rtd_stage2.sh	2026-09-17 16:03:21.626239525 +0000
+@@ -0,0 +1,19 @@
++#!/bin/sh
++set -eu
++fail=0
++ok(){ echo "PASS: $1"; }
++bad(){ echo "FAIL: $1"; fail=1; }
++
++grep -q '#define SYS_RT_WAIT[[:space:]]*40u' src/kernel.c && ok 'SYS_RT_WAIT=40' || bad 'SYS_RT_WAIT=40'
++grep -q 'rt_period_ticks' src/kernel.c && ok 'period converted to scheduler ticks' || bad 'period conversion'
++grep -q 'rt_next_release_tick' src/kernel.c && ok 'absolute periodic release' || bad 'periodic release state'
++grep -q 'rt_deadline_tick' src/kernel.c && ok 'absolute deadline state' || bad 'deadline state'
++grep -q 'rt_missed_deadlines' src/kernel.c && ok 'deadline miss accounting' || bad 'deadline miss accounting'
++grep -q 'rt_runtime_budget' src/kernel.c && ok 'priority-derived runtime budget' || bad 'priority budget'
++grep -q 'SYS_RT_WAIT:rt_wait' src/kernel.c && ok 'RT wait syscall dispatch' || bad 'RT wait dispatch'
++grep -q 'sc(SYS_RT_WAIT' src/rt_sensor.c && ok 'SENSOR completes periodic job with RT_WAIT' || bad 'SENSOR RT_WAIT'
++if grep -q 'rt_period_ticks\*req.priority' src/kernel.c; then bad 'overflow-prone priority multiplication remains'; else ok 'priority budget multiplication is overflow-safe'; fi
++if grep -q 'if(rt_background_active){rt_shell_waiting' src/kernel.c; then bad 'shell read dispatches RT without active job'; else ok 'shell read requires an active RT job'; fi
++# RT_WAIT must block the RT task until next release rather than spinning.
++grep -A22 'static void rt_wait' src/kernel.c | grep -q 'TASK_BLOCKED' && ok 'RT_WAIT blocks until next release' || bad 'RT_WAIT blocking'
++exit $fail
+diff -ruN ./src/kernel.c /tmp/toyos_work/src/kernel.c
+--- ./src/kernel.c	2026-09-17 15:54:59.000000000 +0000
++++ /tmp/toyos_work/src/kernel.c	2026-09-17 16:03:12.184367359 +0000
+@@ -86,6 +86,7 @@
+ #define SYS_CONSOLE_POLL   37u
+ #define SYS_RT_START       38u
+ #define SYS_RT_INFO        39u
++#define SYS_RT_WAIT        40u
+ #define SCHED_TASKS      25u
+ #define EXECMT_MAX_TASKS 25u
+ #define QUEUE_MAX_FILES 25u
+@@ -534,6 +535,13 @@
+     uint32_t rt_period_ms;
+     uint32_t rt_deadline_ms;
+     uint32_t rt_priority;
++    uint32_t rt_period_ticks;
++    uint32_t rt_next_release_tick;
++    uint32_t rt_deadline_tick;
++    uint32_t rt_job_active;
++    uint32_t rt_missed_deadlines;
++    uint32_t rt_runtime_ticks;
++    uint32_t rt_runtime_budget;
+ };
+ static struct sched_task sched_tasks[SCHED_TASKS];
+ static uint32_t sched_current;
+@@ -554,6 +562,7 @@
+ static volatile uint32_t rt_shell_waiting;
+ static uint32_t rt_task_id;
+ static volatile uint32_t rt_started_tick;
++static volatile uint32_t rt_runtime_ticks;
+ static int user_range(uint32_t,uint32_t);
+ static int user_rw_range(uint32_t,uint32_t);
+ static void paging_set_video_user(uint32_t user){
+@@ -670,7 +679,7 @@
+     if(!(st&1u))return;
+     s=inb(KBD);
+     if(s==0xe0||s==0xe1)return;
+-    if(s==0x01){if(queue_active)queue_stop_requested=1;else if(rt_background_active)rt_stop_requested=1;else key_push(0x1bu);return;}
++    if(s==0x01){if(queue_active)queue_stop_requested=1;else if(rt_background_active){rt_stop_requested=1;if(sched_tasks[rt_task_id].state==TASK_BLOCKED)sched_tasks[rt_task_id].state=TASK_READY;}else key_push(0x1bu);return;}
+     if(s==0x2a||s==0x36){shift_state=1;return;}
+     if(s==0xaa||s==0xb6){shift_state=0;return;}
+     if(!(s&0x80)&&s<128){
+@@ -1852,6 +1861,29 @@
+     sched_tasks[0].rt_period_ms=req.period_ms;
+     sched_tasks[0].rt_deadline_ms=req.deadline_ms;
+     sched_tasks[0].rt_priority=req.priority;
++    sched_tasks[0].rt_period_ticks=(req.period_ms+19u)/20u;
++    if(sched_tasks[0].rt_period_ticks==0u)sched_tasks[0].rt_period_ticks=1u;
++    {
++        uint32_t dt=(req.deadline_ms+19u)/20u;
++        if(dt==0u)dt=1u;
++        sched_tasks[0].rt_next_release_tick=timer_ticks;
++        sched_tasks[0].rt_deadline_tick=timer_ticks+dt;
++        sched_tasks[0].rt_job_active=1u;
++        sched_tasks[0].rt_missed_deadlines=0u;
++        /* Fixed-priority RT policy: priority determines the maximum CPU
++           budget available inside one period.  A low priority task still
++           receives at least one tick; 255 receives the whole period.  The
++           split form avoids overflow for large, valid uint32 millisecond
++           periods. */
++        sched_tasks[0].rt_runtime_budget=1u+
++            (sched_tasks[0].rt_period_ticks/255u)*req.priority+
++            ((sched_tasks[0].rt_period_ticks%255u)*req.priority)/255u;
++        if(sched_tasks[0].rt_runtime_budget>sched_tasks[0].rt_period_ticks)
++            sched_tasks[0].rt_runtime_budget=sched_tasks[0].rt_period_ticks;
++        if(sched_tasks[0].rt_runtime_budget==0u)sched_tasks[0].rt_runtime_budget=1u;
++    }
++    sched_tasks[0].rt_runtime_ticks=0u;
++    rt_runtime_ticks=0u;
+     sched_tasks[0].state=TASK_READY;
+     rt_task_id=0;
+     rt_stop_requested=0;
+@@ -1865,6 +1897,30 @@
+     return EXE_OK;
+ }
+ 
++static void rt_wait(struct frame*f){
++    uint32_t now,next,dt;
++    if(!rt_background_active||(f->cs&3u)==0u||read_cr3()!=sched_tasks[rt_task_id].cr3){f->eax=0xffffffffu;return;}
++    now=timer_ticks;
++    if(!sched_tasks[rt_task_id].rt_job_active){f->eax=0;return;}
++    if(now>=sched_tasks[rt_task_id].rt_deadline_tick){
++        sched_tasks[rt_task_id].rt_missed_deadlines++;
++        f->eax=1u;
++    }else f->eax=0u;
++    dt=sched_tasks[rt_task_id].rt_period_ticks;
++    next=sched_tasks[rt_task_id].rt_next_release_tick+dt;
++    while(next<=now)next+=dt;
++    sched_tasks[rt_task_id].rt_next_release_tick=next;
++    sched_tasks[rt_task_id].rt_deadline_tick=next+((sched_tasks[rt_task_id].rt_deadline_ms+19u)/20u);
++    sched_tasks[rt_task_id].rt_job_active=0u;
++    sched_tasks[rt_task_id].rt_runtime_ticks=0u;
++    rt_runtime_ticks=0u;
++    sched_tasks[rt_task_id].state=TASK_BLOCKED;
++    if(rt_shell_frame_valid){
++        load_cr3(sched_saved_shell_cr3);
++        mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
++    }
++}
++
+ static void rt_exit(struct frame*f){
+     if(!rt_background_active){f->eax=0xffffffffu;return;}
+     sched_tasks[rt_task_id].state=TASK_EXIT;
+@@ -1986,28 +2042,58 @@
+     int next;
+     if(!sched_active && !rt_background_active)return;
+     if(rt_background_active && !sched_active){
+-        /* ESC requests termination of the detached RT task regardless of which
+-           Ring-3 context happens to be foreground at the instant of the key
+-           interrupt.  The flag is consumed at the next timer tick, so the
+-           cleanup always happens from the interrupt context safely. */
+-        /* ESC is consumed by the RT program through SYS_CONSOLE_POLL.  Do not
+-           terminate the task here: otherwise SENSOR cannot print its final
+-           message and cleanly execute SYS_EXIT. */
+-        /* Detached RT task and foreground shell share the existing timer IRQ.
+-           No new interrupt path is introduced: we simply alternate the saved
+-           shell context and the RT task context. */
+-        if(read_cr3()==sched_tasks[rt_task_id].cr3){
+-            if(f->cs&3u)mem_copy(sched_tasks[rt_task_id].words,(const void*)f,MT_CONTEXT_WORDS*4u);
+-            if(sched_tasks[rt_task_id].state==TASK_RUNNING)sched_tasks[rt_task_id].state=TASK_READY;
+-            if(rt_shell_frame_valid)mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+-            load_cr3(sched_saved_shell_cr3);
+-        }else if(read_cr3()==sched_saved_shell_cr3 && rt_shell_waiting){
++        uint32_t now=timer_ticks;
++        struct sched_task *rt=&sched_tasks[rt_task_id];
++        /* Release periodic jobs on their absolute timeline. */
++        if(!rt->rt_job_active && now>=rt->rt_next_release_tick){
++            uint32_t dt=(rt->rt_deadline_ms+19u)/20u;
++            if(dt==0u)dt=1u;
++            rt->rt_job_active=1u;
++            rt->rt_deadline_tick=rt->rt_next_release_tick+dt;
++            rt->rt_runtime_ticks=0u;
++            rt_runtime_ticks=0u;
++            if(now>=rt->rt_deadline_tick){
++                rt->rt_missed_deadlines++;
++                rt->rt_job_active=0u;
++                while(rt->rt_next_release_tick<=now)rt->rt_next_release_tick+=rt->rt_period_ticks;
++                rt->rt_deadline_tick=rt->rt_next_release_tick+dt;
++                rt->state=TASK_BLOCKED;
++            }else rt->state=TASK_READY;
++        }
++        if(rt->rt_job_active && now>=rt->rt_deadline_tick){
++            rt->rt_missed_deadlines++;
++            rt->rt_job_active=0u;
++            rt->rt_runtime_ticks=0u;
++            rt_runtime_ticks=0u;
++            while(rt->rt_next_release_tick<=now)rt->rt_next_release_tick+=rt->rt_period_ticks;
++            rt->rt_deadline_tick=rt->rt_next_release_tick+((rt->rt_deadline_ms+19u)/20u);
++            rt->state=TASK_BLOCKED;
++        }
++        if(read_cr3()==rt->cr3){
++            if(f->cs&3u)mem_copy(rt->words,(const void*)f,MT_CONTEXT_WORDS*4u);
++            if(rt->state==TASK_RUNNING)rt->state=TASK_READY;
++            if(rt->rt_job_active){
++                rt->rt_runtime_ticks++;
++                rt_runtime_ticks=rt->rt_runtime_ticks;
++                if(rt->rt_runtime_ticks>=rt->rt_runtime_budget){
++                    rt->rt_runtime_ticks=0u;
++                    rt_runtime_ticks=0u;
++                    if(rt_shell_frame_valid){
++                        mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
++                        load_cr3(sched_saved_shell_cr3);
++                        return;
++                    }
++                }
++            }
++            if(rt_shell_frame_valid){mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);load_cr3(sched_saved_shell_cr3);}
++        }else if(read_cr3()==sched_saved_shell_cr3 && rt_shell_waiting && rt->rt_job_active){
++            /* The RT task has priority over the blocked interactive shell. */
+             mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);
+             rt_shell_frame_valid=1u;
+-            sched_tasks[rt_task_id].state=TASK_RUNNING;
+-            sched_tasks[rt_task_id].switches++;
+-            load_cr3(sched_tasks[rt_task_id].cr3);
+-            mem_copy((void*)f,sched_tasks[rt_task_id].words,MT_CONTEXT_WORDS*4u);
++            rt->state=TASK_RUNNING;
++            rt->switches++;
++            load_cr3(rt->cr3);
++            mem_copy((void*)f,rt->words,MT_CONTEXT_WORDS*4u);
+         }
+         return;
+     }
+@@ -2071,9 +2157,9 @@
+         for(;;){__asm__ volatile("cli");cpu_hlt();}}
+     else if(n==0x80){uint32_t a=f->ebx,b=f->ecx,c=f->edx;switch(f->eax){
+         case SYS_CONSOLE_WRITE:if((f->cs&3u)&&!user_range(a,b)){f->eax=0xffffffffu;break;}f->eax=(b&&a)?console_write_atomic_n((const char*)a,b):0;break;
+-        case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch){rt_shell_waiting=0;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;load_cr3(sched_tasks[rt_task_id].cr3);sched_tasks[rt_task_id].state=TASK_RUNNING;sched_tasks[rt_task_id].switches++;mem_copy((void*)f,sched_tasks[rt_task_id].words,MT_CONTEXT_WORDS*4u);break;}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
++        case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch){rt_shell_waiting=0;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active&&sched_tasks[rt_task_id].rt_job_active){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;load_cr3(sched_tasks[rt_task_id].cr3);sched_tasks[rt_task_id].state=TASK_RUNNING;sched_tasks[rt_task_id].switches++;mem_copy((void*)f,sched_tasks[rt_task_id].words,MT_CONTEXT_WORDS*4u);break;}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
+         case SYS_CONSOLE_POLL:{uint8_t ch=0;if(rt_background_active&&(f->cs&3u)&&read_cr3()==sched_tasks[rt_task_id].cr3&&rt_stop_requested)ch=0x1bu;else ch=key_pop();if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
+-        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&read_cr3()==sched_tasks[rt_task_id].cr3&&rt_background_active){if(a&&user_rw_range(a,12u)){((uint32_t*)a)[0]=sched_tasks[rt_task_id].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rt_task_id].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rt_task_id].rt_priority;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;
++        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&read_cr3()==sched_tasks[rt_task_id].cr3&&rt_background_active){if(a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rt_task_id].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rt_task_id].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rt_task_id].rt_priority;((uint32_t*)a)[3]=sched_tasks[rt_task_id].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rt_task_id].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rt_task_id].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rt_task_id].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rt_task_id].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
+         case SYS_DISK_READ:if((f->cs&3u)&&(c>8u||!user_rw_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_read(a,(void*)b,c)?0:0xffffffffu;break;
+         case SYS_DISK_WRITE:if((f->cs&3u)&&(c>8u||!user_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_write(a,(const void*)b,c)?0:0xffffffffu;break;
+         case SYS_FILE_OPEN:if((f->cs&3u)&&!user_cstr(a)){f->eax=0xffffffffu;break;}f->eax=(uint32_t)fat_open((const char*)a,b);break;
+diff -ruN ./src/rt_sensor.c /tmp/toyos_work/src/rt_sensor.c
+--- ./src/rt_sensor.c	2026-09-17 15:45:28.000000000 +0000
++++ /tmp/toyos_work/src/rt_sensor.c	2026-09-17 16:03:13.515205732 +0000
+@@ -1,4 +1,4 @@
+-/* SENSOR.EXE - ordinary EXE1 program used to verify detached RT launch.
++/* SENSOR.EXE - ordinary EXE1 program used to verify periodic RT launch.
+  * ESC is an explicit user-level termination mechanism.  The kernel also marks
+  * an RT stop request on the ESC IRQ so the key cannot be lost while the shell
+  * happens to be the foreground context; SENSOR consumes the key when it gets
+@@ -10,26 +10,31 @@
+ #define SYS_TIMER_GET     3u
+ #define SYS_CONSOLE_POLL 37u
+ #define SYS_RT_INFO      39u
++#define SYS_RT_WAIT      40u
+ #define SYS_EXIT         12u
+ static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
+ static void put(const char*s){uint32_t n=0;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+ __attribute__((section(".usertext"))) void program_main(void){
+-    uint32_t last=sc(SYS_TIMER_GET,0,0,0);
+-    uint32_t info[3];
+-    uint32_t period_ms=20u, period_ticks=1u;
++    uint32_t info[8];
++    uint32_t period_ms=20u,deadline_ms=20u,priority=0u;
+     uint8_t key=0;
+-    if(sc(SYS_RT_INFO,(uint32_t)info,0,0)==0u){period_ms=info[0];period_ticks=(period_ms+19u)/20u;if(period_ticks==0u)period_ticks=1u;}
+-    put("SENSOR: started as ordinary EXE1 (ESC to stop)\n");
++    if(sc(SYS_RT_INFO,(uint32_t)info,0,0)==0u){period_ms=info[0];deadline_ms=info[1];priority=info[2];}
++    put("SENSOR: started as ordinary EXE1 (ESC to stop) period=");
++    {char b[12];uint32_t v=period_ms,i=0,j;char t;if(v==0u){b[i++]='0';}else{while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}}b[i]=0;put(b);}
++    put("ms deadline=");
++    {char b[12];uint32_t v=deadline_ms,i=0,j;char t;if(v==0u){b[i++]='0';}else{while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}}b[i]=0;put(b);}
++    put("ms priority=");
++    {char b[12];uint32_t v=priority,i=0,j;char t;if(v==0u){b[i++]='0';}else{while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}}b[i]=0;put(b);put("\n");}
+     for(;;){
+         if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){
+             put("SENSOR: ESC -> stopped\n");
+             sc(SYS_EXIT,0,0,0);
+             for(;;){}
+         }
+-        {
+-            uint32_t now=sc(SYS_TIMER_GET,0,0,0);
+-            if(now-last>=period_ticks){last=now;put("SENSOR: tick\n");}
+-        }
++        put("SENSOR: tick\n");
++        {uint32_t wr=sc(SYS_RT_WAIT,0,0,0);
++         if(wr==1u)put("SENSOR: deadline miss\n");
++         if(wr==0xffffffffu){put("SENSOR: RT wait FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}}
+     }
+ }
+ __asm__(
+diff -ruN ./src/rtd.c /tmp/toyos_work/src/rtd.c
+--- ./src/rtd.c	2026-09-17 15:45:51.000000000 +0000
++++ /tmp/toyos_work/src/rtd.c	2026-09-17 16:03:13.515493630 +0000
+@@ -7,8 +7,7 @@
+  * The existing EXE1 ABI has three 16-byte argument slots. The shell therefore
+  * passes SENSOR.EXE in slot 0 and "50 50 3" in slot 1. RTD validates the text
+  * and asks the kernel to create one detached Ring-3 RT task. Period/deadline/
+- * priority are stored as RT metadata in this stage; enforcement is added by
+- * later RT stages without changing this command ABI.
++ * priority are applied by the RT scheduler without changing this command ABI.
+  */
+ typedef unsigned int uint32_t;
+ 

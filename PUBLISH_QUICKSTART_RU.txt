@@ -1,0 +1,35 @@
+ToyOS FIX60ZEI — быстрый GitHub publish
+=======================================
+
+Репозиторий GitHub: AB-bot1968/ToyOS
+
+Текущий remote уже содержит безопасный bootstrap README/COPYRIGHT/AUTHORS.
+Для полной публикации frozen baseline используйте ТОЛЬКО сценарий для существующего repository.
+
+Windows cmd.exe (рекомендуемый путь):
+  publish_to_existing_github.bat
+
+W64DevKit / Git Bash / Linux:
+  ./publish_to_existing_github.sh
+
+Windows-вариант НЕ требует sha256sum. Frozen SHA-256 manifest проверяется
+через Windows PowerShell/.NET. Имя автора задаётся PowerShell UTF-8 BOM,
+поэтому старый cmd.exe не должен перекодировать кириллицу.
+
+Перед commit/tag/push автоматически проверяются 1109 frozen-файлов,
+45 acceptance-тестов, kernel/TestMRT hash и publication safety.
+
+Автор release commit:
+  Ботнев Александр Валерьевич
+  101033309+AB-bot1968@users.noreply.github.com
+
+Создаваемая ветка: main
+Создаваемый tag:  v67.11-B-FIX60ZEI
+Force push не используется.
+
+Не используйте git_publish.bat для пустого repository: удалённый main уже существует.
+
+Подробно: GIT_SETUP_RU.md
+Windows fix: GITHUB_WINDOWS_PREFLIGHT_FIX_RU.md
+Авторское право: COPYRIGHT
+Лицензия: LICENSE_STATUS_RU.md

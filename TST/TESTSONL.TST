@@ -1,0 +1,17 @@
+# FIX60L: SONARDRV may stay READY/poll forever without stealing shell input.
+PRINT FIX60L SONARDRV CONSOLE RESPONSIVENESS TEST
+RUN mtstop ALL
+RUN rtstat stop
+RUN rtstat reset
+RUN hwwd disarm
+RUN safemode normal 0
+ASSERT FILE_EXISTS /SONARDRV.EXE
+RUN execmt SONARDRV.EXE
+ASSERT MT_ACTIVE 1
+# Regression target: FIX60K froze here after toy0>.
+RUN ps
+RUN mtstat
+RUN mtstop ALL
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+PRINT FIX60L SONARDRV CONSOLE RESPONSIVENESS PASS

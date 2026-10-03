@@ -1,0 +1,18 @@
+NETDRV v58.5 — FIX MANIFEST
+
+КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ:
+Входящий TCP SYN-ACK проверял source/destination ports в обратном направлении.
+Исправлено во всех входящих TCP путях.
+
+SYSCALL ABI:
+3 TIMER_GET
+6 FILE_OPEN
+7 FILE_READ
+8 FILE_WRITE
+9 FILE_CLOSE
+12 EXIT
+13 PORT_OUT8
+14 PORT_IN8
+
+Ядро: новых syscall не добавлялось.
+NET.CFG: PORT=8080.

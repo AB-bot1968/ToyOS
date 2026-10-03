@@ -1,5 +1,3 @@
-> **Статус GitHub-публикации:** bootstrap выполнен. Полное дерево зафиксированного FIX60ZEI должно быть загружено fast-forward release commit скриптом `publish_to_existing_github.bat/.sh` из подготовленного publication package. До этого момента репозиторий содержит только публикационный bootstrap.
-
 # ToyOS v67.11-B FIX60ZEI
 
 Стабильная зафиксированная версия учебной 32-битной ОС ToyOS для i386.
@@ -82,9 +80,37 @@ execmt SONARVWR.EXE
 
 ## Публикация в Git
 
-Публичный репозиторий: `AB-bot1968/ToyOS`.
+Планируемый публичный репозиторий: `AB-bot1968/ToyOS`.
 
-Полное дерево текущего стабильного baseline публикуется поверх существующего `main` безопасным fast-forward commit без force.
+Перед публикацией выполните:
+
+```sh
+./git_preflight.sh
+```
+
+Локально подготовить первый commit и annotated tag без push:
+
+```sh
+./git_publish.sh --local
+```
+
+Опубликовать в уже созданный пустой Git-репозиторий:
+
+```sh
+./git_publish.sh https://github.com/AB-bot1968/ToyOS.git
+```
+
+В Windows можно использовать соответствующие `.bat` wrappers.
+
+Для GitHub при наличии GitHub CLI доступен почти полностью автоматический сценарий:
+
+```sh
+./github_publish.sh AB-bot1968/ToyOS public
+```
+
+Он создаёт/использует GitHub repository, публикует `main`, tag `v67.11-B-FIX60ZEI`, формирует source ZIP через `git archive` и создаёт GitHub Release.
+
+Подробности и безопасные варианты запуска: `GIT_SETUP_RU.md`.
 
 ## Защита стабильного baseline
 
@@ -103,8 +129,29 @@ SHA-256 исходного frozen ZIP FIX60ZEI:
 054713d08480739fd4fc869e350959525b96e150a157c0f2553fdb4604b6c434
 ```
 
+## Репозиторий и сгенерированные файлы
+
+В Git хранятся исходники, тесты, документация и необходимые бинарные ресурсы/fixtures, включая:
+
+- `resources/SPLASH.RAW`;
+- `resources/SPLASH_PREVIEW.png`;
+- `tools/Python/TEST.BIN`.
+
+Не должны попадать в Git:
+
+- `build/`;
+- `dist/`;
+- runtime logs;
+- QEMU VM images;
+- локальные ключи/credentials;
+- сгенерированные host binaries.
+
 ## Авторское право и лицензия
 
 Copyright © 2026 **Ботнев Александр Валерьевич**. Все права сохранены.
 
 Файл `COPYRIGHT` фиксирует авторство и правообладателя. Открытая лицензия проекта **не выбрана**; отсутствие `LICENSE` означает, что публичный просмотр репозитория не является разрешением на копирование, модификацию или распространение вне прав, предоставляемых применимым законодательством и условиями GitHub. См. `LICENSE_STATUS_RU.md`.
+
+## История проекта
+
+Исторические README, release notes, verification notes и patch history сохранены в `changes/ProjectHistory/` и других документах корня. Они не заменяют текущую архитектурную спецификацию.

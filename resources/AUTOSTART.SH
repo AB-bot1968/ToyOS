@@ -1,0 +1,1 @@
+exec VGADRV.EXE /SPLASH.RAW

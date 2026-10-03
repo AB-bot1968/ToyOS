@@ -1,0 +1,45 @@
+ToyOS v67.11-B FIX49 — полный регрессионный прогон
+База: FIX48B CURRENT STABLE
+
+Критерий каждого автоматического теста: итоговый FAIL=0. Любой FAIL>0 означает, что FIX49 не фиксируется как stable.
+
+Этап A — новый функционал FIX49 и непосредственно связанные safety/recovery тесты:
+  1. test TESTRCV.TST   — Persistent Fault/Recovery History, порядок FAULT -> DEGRADED -> RESTART -> BUDGET -> SAFE, EVENT.LOG save, cleanup.
+  2. test TESTEVT.TST   — базовый FIX41 RAM lifecycle event ring.
+  3. test TESTLOG.TST   — совместимость persistent EVENT.LOG.
+  4. test TESTSUP.TST   — supervisor restart + recovery markers + SAFE.
+  5. test TESTWD.TST    — software watchdog timeout/stop/restart/budget/SAFE markers.
+  6. test TESTPOL.TST   — supervisor operational-state policy + recovery chain.
+  7. test TESTSAFE.TST  — SAFE state foundation.
+  8. test TESTSFP.TST   — FIX48 SAFE admission policy.
+  9. test TESTHLTH.TST  — consolidated health monitor.
+ 10. test TESTHWWD.TST  — hardware-watchdog control plane.
+ 11. test TESTBOOT.TST  — boot diagnostics.
+
+Этап B — полная системная регрессия остальных подтверждённых подсистем:
+ 12. test TESTCORE.TST
+ 13. test TESTPROC.TST
+ 14. test TESTRES.TST
+ 15. test TESTHB.TST
+ 16. test TESTLOAD.TST
+ 17. test TESTKEY.TST
+
+После полного прогона дополнительно проверить вручную:
+  recoverylog
+  eventlog
+  eventlog save
+  recoverylog disk
+  health
+  safemode
+  hwwd
+  mtstat
+  rtstat
+
+Финальное чистое состояние перед фиксацией stable:
+  safemode normal 0
+  hwwd disarm
+  mtstop ALL
+  rtstat stop
+  rtstat reset
+
+Затем TESTRCV.TST можно повторить последним контрольным тестом; он сам завершает сценарий в NORMAL с RT=0, MT=0, process handles=0 и HWWD_ARMED=0.

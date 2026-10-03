@@ -1,0 +1,27 @@
+ЗАВЕРШЕНИЕ ПУБЛИКАЦИИ ToyOS FIX60ZEI
+======================================
+
+GitHub repository уже создан:
+https://github.com/AB-bot1968/ToyOS.git
+
+Подключённый ChatGPT GitHub-интерфейс создал bootstrap README/COPYRIGHT/AUTHORS,
+но не предоставляет bulk git push локального дерева. Поэтому полный baseline
+публикуется безопасным fast-forward commit поверх уже существующего main.
+
+Windows (из корня распакованного пакета):
+    publish_to_existing_github.bat
+
+Git Bash / W64DevKit shell / Linux:
+    ./publish_to_existing_github.sh
+
+Скрипт автоматически:
+1. Проверяет frozen FIX60ZEI manifest и 45 acceptance tests.
+2. Клонирует AB-bot1968/ToyOS во временный каталог.
+3. Копирует полное publication-ready дерево, не трогая .git.
+4. Повторно выполняет preflight уже в клоне.
+5. Создаёт fast-forward commit от имени Ботнев Александр Валерьевич.
+6. Создаёт annotated tag v67.11-B-FIX60ZEI.
+7. Push main и tag без force.
+
+Если Git запросит аутентификацию, используйте стандартный GitHub вход/PAT/Git Credential Manager.
+Force push скрипт не выполняет.

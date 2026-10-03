@@ -1,0 +1,10 @@
+--- /tmp/toyos_fix6/build.sh	2026-09-18 14:36:16.000000000 +0000
++++ build.sh	2026-09-18 14:47:07.718223483 +0000
+@@ -374,6 +374,7 @@
+ ./check_rtd_stage5_3.sh
+ sh ./check_rtd_stage6_1.sh
+ sh ./check_rtd_stage6_1_fix1.sh
++sh ./check_rtd_stage6_1_fix2.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh

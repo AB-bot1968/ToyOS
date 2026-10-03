@@ -1,0 +1,65 @@
+--- /tmp/toyos_fix3_baseline/src/kernel.c	2026-09-18 08:39:09.000000000 +0000
++++ src/kernel.c	2026-09-18 08:47:11.699080793 +0000
+@@ -564,6 +564,11 @@
+ static uint32_t rt_shell_frame[MT_CONTEXT_WORDS];
+ static uint32_t rt_shell_frame_valid;
+ static volatile uint32_t rt_shell_waiting;
++/* One-interrupt hold after RT yields to a shell blocked in SYS_CONSOLE_READ.
++   Without this hold, readline() immediately re-enters SYS_CONSOLE_READ, sees
++   a ready RT job, and dispatches it again before a keyboard IRQ can deliver
++   the next character. */
++static volatile uint32_t rt_shell_hold;
+ static uint32_t rt_task_id;
+ static volatile uint32_t rt_started_tick;
+ static volatile uint32_t rt_runtime_ticks;
+@@ -1937,7 +1942,7 @@
+     rt_stop_requested&=~(1u<<id);rt_task_count++;rt_background_active=1u;
+     if(rt_task_count==1u){
+         rt_task_id=id;rt_started_tick=timer_ticks;sched_saved_shell_cr3=read_cr3();
+-        mem_copy(rt_shell_frame,saved_user_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_shell_waiting=0u;
++        mem_copy(rt_shell_frame,saved_user_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_shell_waiting=0u;rt_shell_hold=0u;
+     }
+     return EXE_OK;
+ }
+@@ -1950,8 +1955,10 @@
+     if(!rt_shell_frame_valid||!rt_shell_waiting)return;
+     /* SYS_CONSOLE_READ is the only point at which detached RT may suspend the
+        shell. Return value 2 means only "RT quantum ended"; readline() resumes
+-       the same input wait silently, so the prompt is not printed every period. */
++       the same input wait silently, so the prompt is not printed every period.
++       The hold is consumed by the resumed read before it may dispatch RT again. */
+     rt_shell_frame[7]=2u;
++    rt_shell_hold=1u;
+     load_cr3(sched_saved_shell_cr3);
+     mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+ }
+@@ -1977,7 +1984,7 @@
+     if(rt_task_count==0u){
+         rt_background_active=0u;load_cr3(sched_saved_shell_cr3);
+         if(rt_shell_frame_valid)mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+-        rt_shell_frame_valid=0u;rt_shell_waiting=0u;rt_task_id=0u;
++        rt_shell_frame_valid=0u;rt_shell_waiting=0u;rt_shell_hold=0u;rt_task_id=0u;
+         /* Return value 3 is reserved for "last detached RT task exited".
+            readline() uses it to repaint the prompt exactly once; value 2 is
+            reserved for an ordinary RT quantum return while other RT work may
+@@ -2192,8 +2199,8 @@
+         for(;;){__asm__ volatile("cli");cpu_hlt();}}
+     else if(n==0x80){uint32_t a=f->ebx,b=f->ecx,c=f->edx;switch(f->eax){
+         case SYS_CONSOLE_WRITE:if((f->cs&3u)&&!user_range(a,b)){f->eax=0xffffffffu;break;}f->eax=(b&&a)?console_write_atomic_n((const char*)a,b):0;break;
+-        case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch){rt_shell_waiting=0;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){int rid=rt_pick_ready();if(rid>=0){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_task_id=(uint32_t)rid;sched_tasks[rid].state=TASK_RUNNING;sched_tasks[rid].switches++;load_cr3(sched_tasks[rid].cr3);mem_copy((void*)f,sched_tasks[rid].words,MT_CONTEXT_WORDS*4u);break;}}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
+-        case SYS_CONSOLE_POLL:{uint8_t ch=0;{int rid=rt_find_current();if(rid>=0&&(rt_stop_requested&(1u<<rid)))ch=0x1bu;else ch=key_pop();}if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
++        case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch){rt_shell_waiting=0;rt_shell_hold=0u;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){if(rt_shell_hold){rt_shell_hold=0u;__asm__ volatile("sti;hlt;cli":::"memory");continue;}int rid=rt_pick_ready();if(rid>=0){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_task_id=(uint32_t)rid;sched_tasks[rid].state=TASK_RUNNING;sched_tasks[rid].switches++;load_cr3(sched_tasks[rid].cr3);mem_copy((void*)f,sched_tasks[rid].words,MT_CONTEXT_WORDS*4u);break;}}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
++        case SYS_CONSOLE_POLL:{uint8_t ch=0;{int rid=rt_find_current();if(rid>=0){/* Detached RT owns only the explicit ESC stop event. All other keyboard bytes stay in the shell queue so interactive shell input cannot be consumed by SENSOR. */if(rt_stop_requested&(1u<<rid))ch=0x1bu;}else ch=key_pop();}if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
+         case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
+         case SYS_DISK_READ:if((f->cs&3u)&&(c>8u||!user_rw_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_read(a,(void*)b,c)?0:0xffffffffu;break;
+         case SYS_DISK_WRITE:if((f->cs&3u)&&(c>8u||!user_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_write(a,(const void*)b,c)?0:0xffffffffu;break;
+--- /tmp/toyos_fix3_baseline/build.sh	2026-09-18 08:39:25.000000000 +0000
++++ build.sh	2026-09-18 08:47:52.285034079 +0000
+@@ -336,6 +336,7 @@
+ sh ./check_rtd_stage3_fix1.sh
+ sh ./check_rtd_stage3_fix2.sh
+ sh ./check_rtd_stage3_fix3.sh
++sh ./check_rtd_stage3_fix4.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh

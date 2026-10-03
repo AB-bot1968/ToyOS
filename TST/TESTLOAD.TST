@@ -1,0 +1,28 @@
+# FIX60F self-contained RT+MT load regression.
+PRINT FIX60F AUTOMATIC 25MT + 8RT LOAD TEST
+# Never assume boot/prior-test state. Establish the documented clean baseline.
+RUN mtstop ALL
+RUN rtstat stop
+RUN rtstat reset
+RUN hwwd disarm
+RUN safemode normal 0
+ASSERT RT_ACTIVE 0
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+ASSERT SAFE_MODE 0
+ASSERT HWWD_ARMED 0
+START MT 25
+ASSERT MT_ACTIVE 25
+START RT 8
+ASSERT RT_ACTIVE 8
+RUN mtstat
+RUN rtstat
+RUN rtstat stop
+RUN mtstop ALL
+RUN rtstat reset
+ASSERT RT_ACTIVE 0
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+ASSERT SAFE_MODE 0
+ASSERT HWWD_ARMED 0
+PRINT AUTOMATIC LOAD TEST COMPLETE

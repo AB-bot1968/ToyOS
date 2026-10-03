@@ -1,0 +1,5 @@
+--- src/kernel.c
++++ src/kernel.c
+@@
+-for(id=0;id<RT_MAX_TASKS;id++)if(sched_tasks[id].state==TASK_STOPPED||sched_tasks[id].state==TASK_EXIT){slot=(int)id;break;}
++for(id=0;id<RT_MAX_TASKS;id++)if(sched_tasks[id].state==TASK_CREATE||sched_tasks[id].state==TASK_STOPPED||sched_tasks[id].state==TASK_EXIT){slot=(int)id;break;}

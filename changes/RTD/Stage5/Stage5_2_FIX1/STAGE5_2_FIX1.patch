@@ -1,0 +1,186 @@
+--- /tmp/stage52/src/rt_deadline.h	2026-09-18 12:11:24.000000000 +0000
++++ src/rt_deadline.h	2026-09-18 13:06:26.329678474 +0000
+@@ -15,6 +15,15 @@
+     return (unsigned int)(now-target)<0x80000000u;
+ }
+ 
++/* Stage 5.2 FIX1: wrap-safe ordering of two absolute timer values.
++   Returns non-zero when a is strictly before b in modulo-2^32 time, provided
++   the compared interval stays below 2^31 ticks (the same bounded interval
++   required by rt_deadline_reached()). */
++static inline int rt_deadline_before(unsigned int a,unsigned int b){
++    unsigned int d=(unsigned int)(b-a);
++    return d!=0u&&d<0x80000000u;
++}
++
+ static inline unsigned int rt_deadline_absolute(unsigned int release_tick,unsigned int deadline_ticks){
+     return release_tick+deadline_ticks;
+ }
+--- /tmp/stage52/src/kernel.c	2026-09-18 12:45:50.000000000 +0000
++++ src/kernel.c	2026-09-18 13:06:26.330470249 +0000
+@@ -1899,7 +1899,7 @@
+         else {
+             pc=rt_priority_compare(t->rt_priority,sched_tasks[best].rt_priority);
+             if(pc>0||
+-               (pc==0&&(t->rt_deadline_tick<sched_tasks[best].rt_deadline_tick||
++               (pc==0&&(rt_deadline_before(t->rt_deadline_tick,sched_tasks[best].rt_deadline_tick)||
+                 (t->rt_deadline_tick==sched_tasks[best].rt_deadline_tick&&i<(uint32_t)best))))
+                 best=(int)i;
+         }
+--- /tmp/stage52/src/rt_deadline_miss_diag.c	2026-09-18 12:47:46.000000000 +0000
++++ src/rt_deadline_miss_diag.c	2026-09-18 13:06:26.330607827 +0000
+@@ -11,21 +11,25 @@
+ #define SYS_CONSOLE_POLL 37u
+ #define SYS_RT_WAIT      40u
+ #define SYS_RT_DEADLINE_INFO 42u
++#define SYS_RT_TRACE      41u
+ #define SYS_EXIT         12u
+ static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
+ static void put(const char*s){uint32_t n=0u;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+ static void put_u32(uint32_t v){char b[12];uint32_t i=0u,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
+ static uint32_t next_tick(uint32_t start){uint32_t now=start;while(now==start)now=sc(SYS_TIMER_GET,0,0,0);return now;}
++static void trace(void){uint32_t t[5];if(sc(SYS_RT_TRACE,(uint32_t)t,0,0)!=0u)return;put("RTDMISS: dispatch=");put_u32(t[3]);put(" slot=");put_u32(t[0]);put(" priority=");put_u32(t[1]);put(" switches=");put_u32(t[2]);put("\n");}
+ __attribute__((section(".usertext"))) void program_main(void){
+     uint32_t info[5],now,loops=0u;uint8_t key=0u;uint32_t saw_miss=0u;
+     if(sc(SYS_RT_DEADLINE_INFO,(uint32_t)info,0,0)!=0u){put("RTDMISS: info FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}
+     now=info[2];
+     put("RTDMISS: started release=");put_u32(info[0]);put(" deadline=");put_u32(info[1]);put(" now=");put_u32(now);put("\n");
++    trace();
+     while(loops<6u){
+         if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("RTDMISS: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
+         now=next_tick(now);
+         if(sc(SYS_RT_DEADLINE_INFO,(uint32_t)info,0,0)!=0u)break;
+         put("RTDMISS: sample release=");put_u32(info[0]);put(" deadline=");put_u32(info[1]);put(" now=");put_u32(info[2]);put(" missed=");put_u32(info[4]);put("\n");
++        trace();
+         if(info[4]!=0u&&!saw_miss){put("RTDMISS: job missed -> best-effort\n");saw_miss=1u;}
+         loops++;
+     }
+--- /tmp/stage52/build.sh	2026-09-18 12:47:43.000000000 +0000
++++ build.sh	2026-09-18 13:06:48.312724301 +0000
+@@ -361,6 +361,7 @@
+ sh ./check_rtd_stage5_1.sh
+ sh ./check_rtd_stage5_1_fix1.sh
+ sh ./check_rtd_stage5_2.sh
++./check_rtd_stage5_2_fix1.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+--- /tmp/stage52/check_rtd_stage4_2.sh	2026-09-18 12:48:54.000000000 +0000
++++ check_rtd_stage4_2.sh	2026-09-18 13:07:59.255623342 +0000
+@@ -6,7 +6,7 @@
+ 
+ grep -q 'rt_priority_compare(t->rt_priority,sched_tasks\[best\].rt_priority)' src/kernel.c
+ grep -Rq 'Stage 4.2: fixed-priority arbitration is now active' changes/RTD
+-grep -q 't->rt_deadline_tick<sched_tasks\[best\].rt_deadline_tick' src/kernel.c
++grep -q 'rt_deadline_before(t->rt_deadline_tick,sched_tasks\[best\].rt_deadline_tick)' src/kernel.c
+ grep -q 'i<(uint32_t)best' src/kernel.c
+ 
+ cc=${CC:-gcc}
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ check_rtd_stage5_2_fix1.sh	2026-09-18 13:08:22.064306617 +0000
+@@ -0,0 +1,33 @@
++#!/bin/sh
++set -eu
++
++# Stage 5.2 FIX1: verify the actual soft-deadline selection policy used by the
++# runtime path. An on-time READY job must beat any missed READY job regardless
++# of priority; a missed job remains runnable as best-effort when no on-time job
++# is available. Absolute-deadline tie breaking must be wrap-safe.
++
++test -f src/kernel.c
++test -f src/rt_deadline.h
++test -f src/rt_deadline_miss_diag.c
++test -f tools/test_rt_deadline_miss_integration.c
++
++grep -q 'rt_deadline_before' src/kernel.c
++grep -q 'static inline int rt_deadline_before' src/rt_deadline.h
++grep -q 'RTDMISS: dispatch=' src/rt_deadline_miss_diag.c
++grep -q 'RTDMISS: job missed -> best-effort' src/rt_deadline_miss_diag.c
++grep -q 'Exact Stage 5.2 transition' tools/test_rt_deadline_miss_integration.c
++grep -q 'When SENSOR1 blocks' tools/test_rt_deadline_miss_integration.c
++
++grep -Eq '(^|[[:space:]])(sh[[:space:]]+)?\./check_rtd_stage5_2_fix1\.sh' build.sh
++
++tmpdir=${TMPDIR:-/tmp}
++tmp="$tmpdir/toyos_rt_stage52_fix1_$$"
++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
++mkdir -p "$tmp"
++cc=${CC:-gcc}
++$cc -std=c99 -Wall -Wextra -Werror tools/test_rt_deadline_miss_integration.c -o "$tmp/test_rt_deadline_miss_integration"
++"$tmp/test_rt_deadline_miss_integration"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/kernel.c -o "$tmp/kernel.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_deadline_miss_diag.c -o "$tmp/rt_deadline_miss_diag.o"
++
++echo 'RTD Stage 5.2 FIX1 deadline-miss policy checks passed'
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ tools/test_rt_deadline_miss_integration.c	2026-09-18 13:08:21.611024346 +0000
+@@ -0,0 +1,69 @@
++#include <stdio.h>
++#include <stdint.h>
++
++struct task {
++    int ready;
++    int active;
++    int missed;
++    unsigned priority;
++    uint32_t deadline;
++    unsigned slot;
++};
++
++static int before(uint32_t a,uint32_t b){
++    uint32_t d=(uint32_t)(b-a);
++    return d!=0u&&d<0x80000000u;
++}
++
++static int choose_class(const struct task *a,unsigned n,unsigned missed_class){
++    int best=-1;
++    unsigned i;
++    for(i=0;i<n;i++){
++        if(!a[i].ready||!a[i].active)continue;
++        if((a[i].missed?1u:0u)!=missed_class)continue;
++        if(best<0){best=(int)i;continue;}
++        if(a[i].priority>a[best].priority ||
++           (a[i].priority==a[best].priority &&
++            (before(a[i].deadline,a[best].deadline) ||
++             (a[i].deadline==a[best].deadline&&a[i].slot<a[best].slot))))
++            best=(int)i;
++    }
++    return best;
++}
++
++static int choose_next(const struct task *a,unsigned n){
++    int ontime=choose_class(a,n,0u);
++    if(ontime>=0)return ontime;
++    return choose_class(a,n,1u);
++}
++
++int main(void){
++    struct task a[2]={
++        {1,1,0,7,105,0}, /* RTDMISS: on-time initially, higher priority */
++        {1,1,0,3,120,1}  /* SENSOR1: on-time, lower priority */
++    };
++    int next;
++
++    /* Exact first-dispatch situation: RTDMISS gets CPU first because it is
++       still on-time and has the higher priority. */
++    next=choose_next(a,2);
++    if(next!=0){fprintf(stderr,"case1 expected initial RTDMISS slot 0, got %d\n",next);return 1;}
++
++    /* Exact Stage 5.2 transition after RTDMISS misses its deadline: the
++       on-time SENSOR1 must outrank the missed RTDMISS despite priority 3<7. */
++    a[0].missed=1;
++    next=choose_next(a,2);
++    if(next!=1){fprintf(stderr,"case2 expected on-time SENSOR1 slot 1 after miss, got %d\n",next);return 2;}
++
++    /* When SENSOR1 blocks in SYS_RT_WAIT, the missed RTDMISS remains runnable
++       as best-effort and is allowed back onto the CPU. */
++    a[1].ready=0;
++    next=choose_next(a,2);
++    if(next!=0){fprintf(stderr,"case3 expected missed RTDMISS slot 0 as best-effort fallback, got %d\n",next);return 3;}
++
++    /* Deadline ordering itself must remain correct across timer wrap. */
++    if(!before(0xfffffff8u,5u)){fprintf(stderr,"wrap-safe deadline ordering failed\n");return 4;}
++
++    puts("RTD Stage 5.2 FIX1 exact runtime scenario model passed");
++    return 0;
++}

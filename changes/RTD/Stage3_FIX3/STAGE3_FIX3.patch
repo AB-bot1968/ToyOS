@@ -1,0 +1,32 @@
+--- /tmp/toyos_stage3fix2_base/src/kernel.c	2026-09-18 08:24:43.000000000 +0000
++++ src/kernel.c	2026-09-18 08:39:09.726565449 +0000
+@@ -1947,8 +1947,13 @@
+     load_cr3(sched_tasks[next].cr3);mem_copy((void*)f,sched_tasks[next].words,MT_CONTEXT_WORDS*4u);
+ }
+ static void rt_switch_to_shell(struct frame*f){
+-    if(!rt_shell_frame_valid)return;
+-    load_cr3(sched_saved_shell_cr3);mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
++    if(!rt_shell_frame_valid||!rt_shell_waiting)return;
++    /* SYS_CONSOLE_READ is the only point at which detached RT may suspend the
++       shell. Return value 2 means only "RT quantum ended"; readline() resumes
++       the same input wait silently, so the prompt is not printed every period. */
++    rt_shell_frame[7]=2u;
++    load_cr3(sched_saved_shell_cr3);
++    mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+ }
+ static void rt_wait(struct frame*f){
+     int id=rt_find_current();uint32_t now,next,dt;struct sched_task*t;
+@@ -1972,7 +1977,12 @@
+     if(rt_task_count==0u){
+         rt_background_active=0u;load_cr3(sched_saved_shell_cr3);
+         if(rt_shell_frame_valid)mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+-        rt_shell_frame_valid=0u;rt_shell_waiting=0u;rt_task_id=0u;f->eax=2u;return;
++        rt_shell_frame_valid=0u;rt_shell_waiting=0u;rt_task_id=0u;
++        /* Return value 3 is reserved for "last detached RT task exited".
++           readline() uses it to repaint the prompt exactly once; value 2 is
++           reserved for an ordinary RT quantum return while other RT work may
++           still be active. */
++        f->eax=3u;return;
+     }
+     {int next=rt_pick_ready();if(next>=0){rt_switch_to(f,next);return;}}
+     rt_switch_to_shell(f);

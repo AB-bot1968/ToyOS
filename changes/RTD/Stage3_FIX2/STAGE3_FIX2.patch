@@ -1,0 +1,240 @@
+--- ../toyos_stage3fix1/src/kernel.c	2026-09-18 08:11:52.000000000 +0000
++++ src/kernel.c	2026-09-18 08:24:43.704052203 +0000
+@@ -1826,16 +1826,18 @@
+ 
+ /* Stage 3 RT manager.
+  *
+- * The existing FIX2 detached-RT context mechanism is retained.  Stage 3 only
+- * changes the ownership model from one RT task to RT_MAX_TASKS independent
+- * tasks.  Every task keeps its own CR3, image, stack and saved interrupt frame.
+- * The shell keeps one private return frame, exactly as in FIX2.
++ * The FIX2 detached-RT context model remains the base. Stage 3 adds several
++ * independent RT tasks while preserving the FIX2 invariant that rt_task_id
++ * identifies the task whose CR3/context is currently installed for RT code.
++ * The shell remains a separate foreground context captured by SYS_CONSOLE_READ.
+  */
+ static int rt_find_current(void){
+     uint32_t cr3=read_cr3(),i;
+     if(!rt_background_active)return -1;
+-    for(i=0;i<RT_MAX_TASKS;i++)
+-        if(sched_tasks[i].state!=TASK_STOPPED&&sched_tasks[i].state!=TASK_EXIT&&sched_tasks[i].cr3==cr3)return (int)i;
++    for(i=0;i<RT_MAX_TASKS;i++){
++        if((sched_tasks[i].state==TASK_READY||sched_tasks[i].state==TASK_RUNNING||sched_tasks[i].state==TASK_BLOCKED)&&
++           sched_tasks[i].rt_period_ms!=0u&&sched_tasks[i].cr3==cr3)return (int)i;
++    }
+     return -1;
+ }
+ static int rt_pick_ready(void){
+@@ -1844,9 +1846,8 @@
+     for(i=0;i<RT_MAX_TASKS;i++){
+         struct sched_task*t=&sched_tasks[i];
+         if(t->state!=TASK_READY||!t->rt_job_active)continue;
+-        /* Stage 3 intentionally uses earliest absolute deadline as the
+-           deterministic tie-breaker. Priority remains stored and budgeted by
+-           Stage 2; priority-based arbitration is deferred to the next stage. */
++        /* Stage 3 uses EDF as its deterministic ready-order. Priority is not
++           the arbitration rule yet; its existing Stage-2 budget remains active. */
+         if(best<0||t->rt_deadline_tick<sched_tasks[best].rt_deadline_tick||
+            (t->rt_deadline_tick==sched_tasks[best].rt_deadline_tick&&i<(uint32_t)best))best=(int)i;
+     }
+@@ -1857,12 +1858,12 @@
+     for(i=0;i<RT_MAX_TASKS;i++){
+         struct sched_task*t=&sched_tasks[i];
+         uint32_t dt;
+-        if(t->state==TASK_STOPPED||t->state==TASK_EXIT)continue;
++        if(t->rt_period_ms==0u||t->state==TASK_STOPPED||t->state==TASK_EXIT)continue;
+         dt=(t->rt_deadline_ms+19u)/20u;if(dt==0u)dt=1u;
+         if(!t->rt_job_active&&now>=t->rt_next_release_tick){
+             t->rt_job_active=1u;
+-            t->rt_deadline_tick=t->rt_next_release_tick+dt;
+             t->rt_runtime_ticks=0u;
++            t->rt_deadline_tick=t->rt_next_release_tick+dt;
+             if(now>=t->rt_deadline_tick){
+                 t->rt_missed_deadlines++;
+                 t->rt_job_active=0u;
+@@ -1873,19 +1874,20 @@
+         }
+         if(t->rt_job_active&&now>=t->rt_deadline_tick){
+             t->rt_missed_deadlines++;
+-            t->rt_job_active=0u;t->rt_runtime_ticks=0u;
++            t->rt_job_active=0u;
++            t->rt_runtime_ticks=0u;
+             do{t->rt_next_release_tick+=t->rt_period_ticks;}while(t->rt_next_release_tick<=now);
+             t->rt_deadline_tick=t->rt_next_release_tick+dt;
+             t->state=TASK_BLOCKED;
+         }
+     }
+ }
+-
+ static int rt_start_task(uint32_t p,struct frame*f){
+     struct rt_start_request req;
+     char name[QUEUE_NAME_SIZE];
+     uint32_t n,entry,image_end,id;
+     int r,slot=-1;
++    uint32_t caller_cr3;
+     const char *src;
+     if(!user_range(p,sizeof(req)))return EXE_ERR_NAME;
+     mem_copy(&req,(const void*)p,sizeof(req));
+@@ -1903,56 +1905,77 @@
+     n=0;while(n<QUEUE_NAME_SIZE-1u&&src[n]){name[n]=src[n];n++;}
+     if(n==0u)return EXE_ERR_NAME;
+     name[n]=0;
+-    for(id=0;id<RT_MAX_TASKS;id++)if(sched_tasks[id].state==TASK_CREATE||sched_tasks[id].state==TASK_STOPPED||sched_tasks[id].state==TASK_EXIT){slot=(int)id;break;}
++    for(id=0;id<RT_MAX_TASKS;id++){
++        if(sched_tasks[id].state==TASK_CREATE||sched_tasks[id].state==TASK_STOPPED||sched_tasks[id].state==TASK_EXIT){slot=(int)id;break;}
++    }
+     if(slot<0)return EXE_ERR_BUSY;
+     id=(uint32_t)slot;
++    caller_cr3=read_cr3();
+     mem_set((void*)sched_stack_phys(id),0,0x1000u);
+     mem_set(&sched_tasks[id],0,sizeof(sched_tasks[id]));
+     sched_tasks[id].state=TASK_STOPPED;sched_tasks[id].id=id;sched_tasks[id].cr3=(uint32_t)mt_page_directory[id];
+     paging_prepare_execmt_task(id);
+     r=execmt_load_one(name,id,&entry,&image_end);
+-    if(r!=EXE_OK){load_cr3(sched_saved_shell_cr3);return r;}
++    if(r!=EXE_OK){load_cr3(caller_cr3);return r;}
+     sched_load_initial(&sched_tasks[id],entry,MT_STACK_TOP,(uint32_t)mt_page_directory[id],id);
+     sched_tasks[id].image_end=image_end;
+     mem_copy(sched_tasks[id].name,name,QUEUE_NAME_SIZE);
+     sched_tasks[id].rt_period_ms=req.period_ms;sched_tasks[id].rt_deadline_ms=req.deadline_ms;sched_tasks[id].rt_priority=req.priority;
+     sched_tasks[id].rt_period_ticks=(req.period_ms+19u)/20u;if(sched_tasks[id].rt_period_ticks==0u)sched_tasks[id].rt_period_ticks=1u;
+     {uint32_t dt=(req.deadline_ms+19u)/20u;if(dt==0u)dt=1u;
+-        sched_tasks[id].rt_next_release_tick=timer_ticks;sched_tasks[id].rt_deadline_tick=timer_ticks+dt;sched_tasks[id].rt_job_active=1u;sched_tasks[id].rt_missed_deadlines=0u;
+-        sched_tasks[id].rt_runtime_budget=1u+(sched_tasks[id].rt_period_ticks/255u)*req.priority+((sched_tasks[id].rt_period_ticks%255u)*req.priority)/255u;
++        sched_tasks[id].rt_next_release_tick=timer_ticks;
++        sched_tasks[id].rt_deadline_tick=timer_ticks+dt;
++        sched_tasks[id].rt_job_active=1u;
++        sched_tasks[id].rt_missed_deadlines=0u;
++        sched_tasks[id].rt_runtime_budget=1u+
++            (sched_tasks[id].rt_period_ticks/255u)*req.priority+
++            ((sched_tasks[id].rt_period_ticks%255u)*req.priority)/255u;
+         if(sched_tasks[id].rt_runtime_budget>sched_tasks[id].rt_period_ticks)sched_tasks[id].rt_runtime_budget=sched_tasks[id].rt_period_ticks;
+         if(sched_tasks[id].rt_runtime_budget==0u)sched_tasks[id].rt_runtime_budget=1u;
+     }
+     sched_tasks[id].rt_runtime_ticks=0u;sched_tasks[id].state=TASK_READY;
+     rt_stop_requested&=~(1u<<id);rt_task_count++;rt_background_active=1u;
+-    if(rt_task_count==1u){rt_task_id=id;rt_started_tick=timer_ticks;sched_saved_shell_cr3=read_cr3();mem_copy(rt_shell_frame,saved_user_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;}
+-    else if(rt_task_id>=RT_MAX_TASKS||sched_tasks[rt_task_id].state==TASK_STOPPED||sched_tasks[rt_task_id].state==TASK_EXIT)rt_task_id=id;
++    if(rt_task_count==1u){
++        rt_task_id=id;rt_started_tick=timer_ticks;sched_saved_shell_cr3=read_cr3();
++        mem_copy(rt_shell_frame,saved_user_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_shell_waiting=0u;
++    }
+     return EXE_OK;
+ }
+-
++static void rt_switch_to(struct frame*f,int next){
++    if(next<0)return;
++    rt_task_id=(uint32_t)next;sched_tasks[next].state=TASK_RUNNING;sched_tasks[next].switches++;
++    load_cr3(sched_tasks[next].cr3);mem_copy((void*)f,sched_tasks[next].words,MT_CONTEXT_WORDS*4u);
++}
++static void rt_switch_to_shell(struct frame*f){
++    if(!rt_shell_frame_valid)return;
++    load_cr3(sched_saved_shell_cr3);mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
++}
+ static void rt_wait(struct frame*f){
+-    int id=rt_find_current();uint32_t now,next,dt;
+-    struct sched_task*t;
+-    if(id<0||(f->cs&3u)==0u)return;
++    int id=rt_find_current();uint32_t now,next,dt;struct sched_task*t;
++    if(id<0||(f->cs&3u)==0u){f->eax=0xffffffffu;return;}
+     t=&sched_tasks[id];now=timer_ticks;
+     if(!t->rt_job_active){f->eax=0;return;}
+     if(now>=t->rt_deadline_tick){t->rt_missed_deadlines++;f->eax=1u;}else f->eax=0u;
+     dt=t->rt_period_ticks;next=t->rt_next_release_tick+dt;while(next<=now)next+=dt;
+-    t->rt_next_release_tick=next;t->rt_deadline_tick=next+((t->rt_deadline_ms+19u)/20u);t->rt_job_active=0u;t->rt_runtime_ticks=0u;
++    t->rt_next_release_tick=next;t->rt_deadline_tick=next+((t->rt_deadline_ms+19u)/20u);
++    t->rt_job_active=0u;t->rt_runtime_ticks=0u;
+     mem_copy(t->words,(const void*)f,MT_CONTEXT_WORDS*4u);t->state=TASK_BLOCKED;
+-    rt_task_id=(uint32_t)id;
+-    {int nextid=rt_pick_ready();if(nextid>=0){rt_task_id=(uint32_t)nextid;sched_tasks[nextid].state=TASK_RUNNING;sched_tasks[nextid].switches++;load_cr3(sched_tasks[nextid].cr3);mem_copy((void*)f,sched_tasks[nextid].words,MT_CONTEXT_WORDS*4u);return;}}
+-    if(rt_shell_frame_valid){load_cr3(sched_saved_shell_cr3);mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);}
++    {int nextid=rt_pick_ready();if(nextid>=0){rt_switch_to(f,nextid);return;}}
++    rt_switch_to_shell(f);
+ }
+-
+ static void rt_exit(struct frame*f){
+     int id=rt_find_current();
+     if(id<0){f->eax=0xffffffffu;return;}
+     mem_copy(sched_tasks[id].words,(const void*)f,MT_CONTEXT_WORDS*4u);
+     sched_tasks[id].state=TASK_EXIT;rt_stop_requested&=~(1u<<id);
+-    if(rt_task_count)rt_task_count--;rt_background_active=(rt_task_count!=0u);rt_task_id=(uint32_t)id;
+-    if(rt_background_active){int next=rt_pick_ready();if(next>=0){rt_task_id=(uint32_t)next;sched_tasks[next].state=TASK_RUNNING;sched_tasks[next].switches++;load_cr3(sched_tasks[next].cr3);mem_copy((void*)f,sched_tasks[next].words,MT_CONTEXT_WORDS*4u);return;}}
+-    load_cr3(sched_saved_shell_cr3);if(rt_shell_frame_valid)mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=0u;rt_shell_waiting=0u;f->eax=2u;
++    if(rt_task_count)rt_task_count--;
++    if(rt_task_count==0u){
++        rt_background_active=0u;load_cr3(sched_saved_shell_cr3);
++        if(rt_shell_frame_valid)mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
++        rt_shell_frame_valid=0u;rt_shell_waiting=0u;rt_task_id=0u;f->eax=2u;return;
++    }
++    {int next=rt_pick_ready();if(next>=0){rt_switch_to(f,next);return;}}
++    rt_switch_to_shell(f);
+ }
+ 
+ static int execmt_prepare(uint32_t p,uint32_t count,struct frame*f){
+@@ -2057,32 +2080,53 @@
+     mem_copy((void*)f,sched_tasks[sched_current].words,MT_CONTEXT_WORDS*4u);
+ }
+ static void sched_irq_tick(struct frame*f){
+-    int current,next;
++    int next;
+     if(!sched_active&&!rt_background_active)return;
+     if(rt_background_active&&!sched_active){
+-        uint32_t now=timer_ticks,i;
++        uint32_t now=timer_ticks;
++        int current;
+         rt_release_jobs(now);
+         current=rt_find_current();
+         if(current>=0){
+             struct sched_task*t=&sched_tasks[current];
++            uint32_t budget_hit=0u;
+             rt_task_id=(uint32_t)current;
++            /* Only a Ring-3 interrupt frame is safe to save as the task's
++               resumable context. The kernel frame itself remains transient. */
+             if(f->cs&3u)mem_copy(t->words,(const void*)f,MT_CONTEXT_WORDS*4u);
+             if(t->state==TASK_RUNNING)t->state=TASK_READY;
+-            if(t->rt_job_active)t->rt_runtime_ticks++;
+-            if(t->rt_job_active&&t->rt_runtime_ticks>=t->rt_runtime_budget){
+-                t->rt_runtime_ticks=0u;t->rt_job_active=0u;
+-                do{t->rt_next_release_tick+=t->rt_period_ticks;}while(t->rt_next_release_tick<=now);
+-                t->rt_deadline_tick=t->rt_next_release_tick+((t->rt_deadline_ms+19u)/20u);t->state=TASK_BLOCKED;
++            if(t->rt_job_active){
++                t->rt_runtime_ticks++;
++                if(t->rt_runtime_ticks>=t->rt_runtime_budget){
++                    t->rt_runtime_ticks=0u;
++                    budget_hit=1u;
++                }
+             }
+             next=rt_pick_ready();
+-            if(next>=0){rt_task_id=(uint32_t)next;sched_tasks[next].state=TASK_RUNNING;sched_tasks[next].switches++;load_cr3(sched_tasks[next].cr3);sched_announce(&sched_tasks[next]);mem_copy((void*)f,sched_tasks[next].words,MT_CONTEXT_WORDS*4u);return;}
+-            if(rt_shell_frame_valid){load_cr3(sched_saved_shell_cr3);mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);}
++            /* When the current job consumes its budget, it must yield to a
++               different RT job when one is ready; if none is ready, preserve
++               the FIX2 behavior and return to the shell. This is important
++               for the one-task case: the shell must not be starved by a task
++               repeatedly selecting itself at every IRQ0. */
++            if(budget_hit){
++                if(next>=0&&next!=current){rt_switch_to(f,next);return;}
++                if(rt_shell_frame_valid){rt_switch_to_shell(f);return;}
++                if(next>=0){rt_switch_to(f,next);return;}
++            }else{
++                if(next>=0&&next!=current){rt_switch_to(f,next);return;}
++                if(next==current){
++                    t->state=TASK_RUNNING;
++                    load_cr3(t->cr3);
++                    mem_copy((void*)f,t->words,MT_CONTEXT_WORDS*4u);
++                    return;
++                }
++            }
++            if(rt_shell_frame_valid){rt_switch_to_shell(f);return;}
+         }else if(read_cr3()==sched_saved_shell_cr3&&rt_shell_waiting){
+-            /* FIX2 invariant: IRQ0 never copies its Ring-0 frame into
+-               rt_shell_frame.  That frame is captured only by
+-               SYS_CONSOLE_READ while returning from Ring 3. */
++            /* FIX2 invariant: IRQ0 never stores its Ring-0 frame in the shell
++               return frame. SYS_CONSOLE_READ captured the Ring-3 frame first. */
+             next=rt_pick_ready();
+-            if(next>=0){rt_task_id=(uint32_t)next;rt_shell_frame_valid=1u;sched_tasks[next].state=TASK_RUNNING;sched_tasks[next].switches++;load_cr3(sched_tasks[next].cr3);sched_announce(&sched_tasks[next]);mem_copy((void*)f,sched_tasks[next].words,MT_CONTEXT_WORDS*4u);}
++            if(next>=0){rt_switch_to(f,next);return;}
+         }
+         return;
+     }

@@ -1,0 +1,203 @@
+--- /tmp/toyos_fix4_base/build.sh	2026-09-18 08:47:52.000000000 +0000
++++ build.sh	2026-09-18 09:00:29.567576248 +0000
+@@ -337,6 +337,7 @@
+ sh ./check_rtd_stage3_fix2.sh
+ sh ./check_rtd_stage3_fix3.sh
+ sh ./check_rtd_stage3_fix4.sh
++sh ./check_rtd_stage3_f10.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+--- /tmp/toyos_fix4_base/src/kernel.c	2026-09-18 08:47:11.000000000 +0000
++++ src/kernel.c	2026-09-18 08:59:41.609968436 +0000
+@@ -638,6 +638,7 @@
+ /* PS/2 Set-1: индекс строки = непосредственно scancode; 0x1C = Enter. */
+ static const char keymap[128]="\0\0331234567890-=\b\tqwertyuiop[]\n\0asdfghjkl;'`\0\\zxcvbnm,./\0\0\0 \0";
+ static const char keymap_shift[128]="\0\033!@#$%^&*()_+\b\tQWERTYUIOP{}\n\0ASDFGHJKL:\"~\0|ZXCVBNM<>?\0\0\0 \0";
++#define KEY_EVENT_F10 0xf0u
+ static void key_push(uint8_t c){uint8_t n=(uint8_t)(khead+1);if(n!=ktail){keybuf[khead]=c;khead=n;}}
+ static uint8_t key_pop(void){uint8_t c;if(khead==ktail)return 0;c=keybuf[ktail];ktail++;return c;}
+ 
+@@ -691,6 +692,7 @@
+     if(s==0x01){if(queue_active)queue_stop_requested=1;else if(rt_background_active){uint32_t id=rt_task_id;if(id<RT_MAX_TASKS&&sched_tasks[id].state!=TASK_STOPPED&&sched_tasks[id].state!=TASK_EXIT){rt_stop_requested|=(1u<<id);if(sched_tasks[id].state==TASK_BLOCKED)sched_tasks[id].state=TASK_READY;}}else key_push(0x1bu);return;}
+     if(s==0x2a||s==0x36){shift_state=1;return;}
+     if(s==0xaa||s==0xb6){shift_state=0;return;}
++    if(s==0x44){key_push(KEY_EVENT_F10);return;}
+     if(!(s&0x80)&&s<128){
+         char c=shift_state?keymap_shift[s]:keymap[s];
+         if(c)key_push((uint8_t)c);
+@@ -2199,7 +2201,7 @@
+         for(;;){__asm__ volatile("cli");cpu_hlt();}}
+     else if(n==0x80){uint32_t a=f->ebx,b=f->ecx,c=f->edx;switch(f->eax){
+         case SYS_CONSOLE_WRITE:if((f->cs&3u)&&!user_range(a,b)){f->eax=0xffffffffu;break;}f->eax=(b&&a)?console_write_atomic_n((const char*)a,b):0;break;
+-        case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch){rt_shell_waiting=0;rt_shell_hold=0u;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){if(rt_shell_hold){rt_shell_hold=0u;__asm__ volatile("sti;hlt;cli":::"memory");continue;}int rid=rt_pick_ready();if(rid>=0){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_task_id=(uint32_t)rid;sched_tasks[rid].state=TASK_RUNNING;sched_tasks[rid].switches++;load_cr3(sched_tasks[rid].cr3);mem_copy((void*)f,sched_tasks[rid].words,MT_CONTEXT_WORDS*4u);break;}}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
++        case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch==KEY_EVENT_F10){rt_shell_waiting=0;rt_shell_hold=0u;f->eax=4u;break;}if(ch){rt_shell_waiting=0;rt_shell_hold=0u;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){if(rt_shell_hold){rt_shell_hold=0u;__asm__ volatile("sti;hlt;cli":::"memory");continue;}int rid=rt_pick_ready();if(rid>=0){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_task_id=(uint32_t)rid;sched_tasks[rid].state=TASK_RUNNING;sched_tasks[rid].switches++;load_cr3(sched_tasks[rid].cr3);mem_copy((void*)f,sched_tasks[rid].words,MT_CONTEXT_WORDS*4u);break;}}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
+         case SYS_CONSOLE_POLL:{uint8_t ch=0;{int rid=rt_find_current();if(rid>=0){/* Detached RT owns only the explicit ESC stop event. All other keyboard bytes stay in the shell queue so interactive shell input cannot be consumed by SENSOR. */if(rt_stop_requested&(1u<<rid))ch=0x1bu;}else ch=key_pop();}if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
+         case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
+         case SYS_DISK_READ:if((f->cs&3u)&&(c>8u||!user_rw_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_read(a,(void*)b,c)?0:0xffffffffu;break;
+--- /tmp/toyos_fix4_base/src/user_shell.c	2026-09-18 08:39:09.000000000 +0000
++++ src/user_shell.c	2026-09-18 09:01:24.512645162 +0000
+@@ -52,6 +52,11 @@
+ #define FAT16_MODE_CREATE 0x04u
+ #define FAT16_MODE_TRUNC  0x08u
+ #define FAT16_MODE_APPEND 0x10u
++#define RT_PENDING_MAX 4u
++#define SHELL_READ_F10 4u
++static char pending_rt_args[RT_PENDING_MAX][EXEC_ARG_BLOCK_SIZE];
++static uint32_t pending_rt_count;
++static uint32_t shell_f10_event;
+ 
+ /* Syscall ABI: EAX=number, EBX=arg1, ECX=arg2, EDX=arg3, EAX=return. */
+ __attribute__((section(".usertext"))) static uint32_t syscall3(uint32_t n,uint32_t a,uint32_t b,uint32_t c){
+@@ -103,7 +108,7 @@
+ __attribute__((section(".usertext"))) static void skip(char**p){while(**p==' '||**p=='\t')(*p)++;}
+ __attribute__((section(".usertext"))) static uint32_t number(char**p){uint32_t v=0,d;skip(p);if((*p)[0]=='0'&&((*p)[1]=='x'||(*p)[1]=='X')){*p+=2;while(1){if(**p>='0'&&**p<='9')d=(uint32_t)(**p-'0');else if(**p>='a'&&**p<='f')d=(uint32_t)(**p-'a'+10);else if(**p>='A'&&**p<='F')d=(uint32_t)(**p-'A'+10);else break;v=(v<<4)|d;(*p)++;}}else{while(**p>='0'&&**p<='9'){v=v*10u+(uint32_t)(*(*p)-'0');(*p)++;}}return v;}
+ __attribute__((section(".usertext"))) static void trim(char*s){uint32_t n=sl(s);while(n&& (s[n-1]==' '||s[n-1]=='\t'||s[n-1]=='\n'||s[n-1]=='\r'))s[--n]=0;}
+-__attribute__((section(".usertext"))) static void readline(char*b,uint32_t cap){uint32_t n=0;while(n+1<cap){char c;uint32_t r=sys_console_read(&c,1);if(r==0xffffffffu){put("read: FAIL\n");b[0]=0;return;}if(r==2u)continue;if(r==3u){put("toy0> ");continue;}if(r!=1)continue;if(c=='\n'){b[n]=0;put("\n");return;}if(c=='\b'){if(n){n--;put("\b");}continue;}b[n++]=c;putn(&c,1);}b[n]=0;put("\n");}
++__attribute__((section(".usertext"))) static void readline(char*b,uint32_t cap){uint32_t n=0;while(n+1<cap){char c;uint32_t r=sys_console_read(&c,1);if(r==0xffffffffu){put("read: FAIL\n");b[0]=0;return;}if(r==SHELL_READ_F10){if(n)put("\n");b[0]=0;shell_f10_event=1u;return;}if(r==2u)continue;if(r==3u){put("toy0> ");continue;}if(r!=1)continue;if(c=='\n'){b[n]=0;put("\n");return;}if(c=='\b'){if(n){n--;put("\b");}continue;}b[n++]=c;putn(&c,1);}b[n]=0;put("\n");}
+ /*
+  * v64: справка разбита на страницы, чтобы добавление новых команд больше не
+  * приводило к тому, что нижняя часть help исчезает за пределами экрана.
+@@ -137,7 +142,7 @@
+         put("  exec NETDRV.EXE IP SEND|RECV FILE.TXT\n");
+         put("  exec NETDRV.EXE TELEMETRY MASTER|SLAVE1|SLAVE2 ARG\n");
+         put("  exec VGADRV.EXE FILE    display 320x200 VGA image; any key returns to text mode\n");
+-        put("  exec RTD.EXE SENSOR.EXE PERIOD DEADLINE PRIORITY [DELAY] launch up to 4 detached RT tasks\n");
++        put("  exec RTD.EXE SENSOR.EXE PERIOD DEADLINE PRIORITY [DELAY] queue RT task; F10 starts queued task(s)\n");
+         put("  execmt FILE1.EXE [FILE2.EXE ... FILE25.EXE]\n");
+         put("  execq REPEAT FILE1 [FILE2 ... FILE25]\n");
+         put("  execq forever FILE1 [FILE2 ... FILE25]\n");
+@@ -290,25 +295,38 @@
+ }
+ __attribute__((section(".usertext"))) static void exec_rtd_command(char*p){
+     char target[EXEC_ARG_SIZE],period[EXEC_ARG_SIZE],deadline[EXEC_ARG_SIZE],priority[EXEC_ARG_SIZE],delay[EXEC_ARG_SIZE];
+-    char packed[EXEC_ARG_SIZE];
+-    char args[EXEC_ARG_BLOCK_SIZE];
+-    uint32_t r,i,n=0;
+-    token(&p,target,sizeof(target)); token(&p,period,sizeof(period)); token(&p,deadline,sizeof(deadline)); token(&p,priority,sizeof(priority)); token(&p,delay,sizeof(delay));
+-    skip(&p);
++    char packed[EXEC_ARG_SIZE];uint32_t i,n=0,slot;
++    token(&p,target,sizeof(target)); token(&p,period,sizeof(period)); token(&p,deadline,sizeof(deadline)); token(&p,priority,sizeof(priority)); token(&p,delay,sizeof(delay)); skip(&p);
+     if(!target[0]||!period[0]||!deadline[0]||!priority[0]||*p){put("usage: exec RTD.EXE SENSOR.EXE PERIOD_MS DEADLINE_MS PRIORITY [DELAY_MS]\n");return;}
++    if(pending_rt_count>=RT_PENDING_MAX){put("RTD: pending queue is full (maximum 4 tasks); press F10 to start queued task(s)\n");return;}
+     for(i=0;i<sizeof(packed);i++)packed[i]=0;
+     for(i=0;i<sizeof(period)-1u&&period[i]&&n<sizeof(packed)-1u;i++)packed[n++]=period[i];
+     if(n+1u>=sizeof(packed)){put("exec RTD: parameter string too long\n");return;}packed[n++]=' ';
+     for(i=0;i<sizeof(deadline)-1u&&deadline[i]&&n<sizeof(packed)-1u;i++)packed[n++]=deadline[i];
+     if(n+1u>=sizeof(packed)){put("exec RTD: parameter string too long\n");return;}packed[n++]=' ';
+     for(i=0;i<sizeof(priority)-1u&&priority[i]&&n<sizeof(packed)-1u;i++)packed[n++]=priority[i];
+-    if(delay[0]){ if(n+1u>=sizeof(packed)){put("exec RTD: parameter string too long\n");return;} packed[n++]=' '; for(i=0;i<sizeof(delay)-1u&&delay[i]&&n<sizeof(packed)-1u;i++)packed[n++]=delay[i]; }
+-    packed[n]=0;
+-    for(i=0;i<sizeof(args);i++)args[i]=0;
+-    for(i=0;i<sizeof(target)-1u&&target[i];i++)args[i]=target[i];
+-    for(i=0;i<sizeof(packed)-1u&&packed[i];i++)args[EXEC_ARG_SIZE+i]=packed[i];
+-    r=sys_exec_args("/RTD.EXE",args);
+-    if(r!=0){put("exec RTD: FAIL ");{char b[12];dec(r,b);put(b);}put("\n");}
++    if(delay[0]){if(n+1u>=sizeof(packed)){put("exec RTD: parameter string too long\n");return;}packed[n++]=' ';for(i=0;i<sizeof(delay)-1u&&delay[i]&&n<sizeof(packed)-1u;i++)packed[n++]=delay[i];}
++    packed[n]=0;slot=pending_rt_count;
++    for(i=0;i<EXEC_ARG_BLOCK_SIZE;i++)pending_rt_args[slot][i]=0;
++    for(i=0;i<sizeof(target)-1u&&target[i];i++)pending_rt_args[slot][i]=target[i];
++    for(i=0;i<sizeof(packed)-1u&&packed[i];i++)pending_rt_args[slot][EXEC_ARG_SIZE+i]=packed[i];
++    pending_rt_count++;
++    put("RTD: task prepared: ");put(target);put(" ");put(period);put(" ");put(deadline);put(" ");put(priority);if(delay[0]){put(" ");put(delay);}put("\n");
++    put("RTD: enter next RT command or press F10 to start queued task(s)\n");
++}
++
++__attribute__((section(".usertext"))) static void rt_launch_pending(void){
++    uint32_t i,j,count=pending_rt_count,r;uint32_t launched=0u;
++    if(count==0u){put("RTD: no queued tasks\n");return;}
++    put("RTD: F10 pressed, starting queued task(s): ");{char b[12];dec(count,b);put(b);}put("\n");
++    for(i=0;i<count;i++){
++        r=sys_exec_args("/RTD.EXE",pending_rt_args[i]);
++        if(r==0u){launched++;put("RTD: task ");{char b[12];dec(i+1u,b);put(b);}put(" started\n");}
++        else{put("RTD: task ");{char b[12];dec(i+1u,b);put(b);}put(" start FAIL code=");{char b[12];dec(r,b);put(b);}put("\n");break;}
++    }
++    if(launched==count){pending_rt_count=0u;return;}
++    for(j=launched;j<count;j++)for(r=0;r<EXEC_ARG_BLOCK_SIZE;r++)pending_rt_args[j-launched][r]=pending_rt_args[j][r];
++    pending_rt_count=count-launched;
+ }
+ __attribute__((section(".usertext"))) static void exec_file(const char*name){uint32_t r=sys_exec(name);if(r==0)return;put("exec: FAIL ");if(r==0xffffffffu)put("-1\n");else{char b[12];dec(r,b);put(b);put("\n");}}
+ __attribute__((section(".usertext"))) static void do_syscall(char*p){uint32_t n,a,b,r;char out[12];skip(&p);n=number(&p);skip(&p);if(n==SYS_CONSOLE_WRITE){r=sys_console_write(p,sl(p));put("\nsyscall 1 -> ");dec(r,out);put(out);put(" bytes\n");return;}if(n==SYS_TIMER_GET){r=sys_timer_get();put("\nsyscall 3 -> ");dec(r,out);put(out);put(" ticks\n");return;}if(n==SYS_MT_STOP){r=sys_mt_stop();put("\nsyscall 19 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_MT_START){r=sys_mt_start();put("\nsyscall 18 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_BLOCK){r=sys_sched_block();put("\nsyscall 20 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_WAKE){if(!*p){put("\nsyscall 21: usage syscall 21 TASK_ID\n");return;}a=number(&p);r=sys_sched_wake(a);put("\nsyscall 21 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_SCHED_EXIT){r=sys_sched_exit();put("\nsyscall 22 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_CONSOLE_READ){put("syscall 2: type one character> ");{char x;put("\n");r=sys_console_read(&x,1);if(r==0xffffffffu){put("read=FAIL\n");return;}if(r==1){put("\nread=\"");putn(&x,1);put("\"\n");}else put("\nread=\"\n");}return;}if(n==SYS_PORT_OUT8){if(!*p){put("\nsyscall 13: usage syscall 13 PORT VALUE\n");return;}a=number(&p);skip(&p);if(!*p){put("\nsyscall 13: usage syscall 13 PORT VALUE\n");return;}b=number(&p);if(a>0xffffu||b>0xffu){put("\nsyscall 13: invalid port/value\n");return;}r=sys_port_out8(a,b);put("\nsyscall 13 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_PORT_IN8){if(!*p){put("\nsyscall 14: usage syscall 14 PORT\n");return;}a=number(&p);if(a>0xffffu){put("\nsyscall 14: invalid port\n");return;}r=sys_port_in8(a);if(r==0xffffffffu){put("\nsyscall 14 -> FAIL\n");return;}hex8(r,out);put("\nsyscall 14 -> 0x");put(out);put(" (");dec(r,out);put(out);put(")\n");return;}if(n==SYS_QUEUE_STOP){r=sys_queue_stop();put("\nsyscall 16 -> ");put(r==0?"requested\n":"no active queue\n");return;}if(n==SYS_FILE_SIZE){skip(&p);if(!*p){put("\nsyscall 17: usage syscall 17 FILE\n");return;}r=sys_file_size(p);put("\nsyscall 17 -> ");if(r==0xffffffffu)put("FAIL\n");else{dec(r,out);put(out);put(" bytes\n");}return;}if(n==SYS_EXECMT){put("syscall 23 is intended for execmt; use: execmt FILE1 ... FILE25\n");return;}if(n==SYS_EXEC_QUEUE){put("syscall 15 is intended for execq; use: execq REPEAT FILE1 ... FILE25\n");return;}if(n==SYS_CHDIR){if(!*p){put("\nsyscall 29: usage syscall 29 PATH\n");return;}r=sys_chdir(p);put("\nsyscall 29 -> ");put(r==0?"OK\n":"FAIL\n");return;}if(n==SYS_GETCWD){char cwd[128];r=sys_getcwd(cwd,sizeof(cwd));put("\nsyscall 30 -> ");if(r==0xffffffffu)put("FAIL\n");else{put(cwd);put("\n");}return;}put("\nsyscall: unsupported number\n");}
+@@ -602,7 +620,11 @@
+ 
+ __attribute__((section(".usertext"))) static void shell_loop(void){
+     char line[400];
+-    for(;;){put("toy0> ");readline(line,sizeof(line));trim(line);if(eq(line,""))continue;execute_line(line);}
++    for(;;){
++        put("toy0> ");shell_f10_event=0u;readline(line,sizeof(line));
++        if(shell_f10_event){rt_launch_pending();continue;}
++        trim(line);if(eq(line,""))continue;execute_line(line);
++    }
+ }
+ 
+ __attribute__((section(".usertext"))) void shell_run(void){
+--- /tmp/toyos_fix4_base/README.md	2026-09-18 08:12:31.000000000 +0000
++++ README.md	2026-09-18 09:00:29.567822437 +0000
+@@ -736,23 +736,30 @@
+ собственный CR3, image slot, stack и сохранённый контекст существующего
+ scheduler. Shell сохраняет отдельный FIX2 context.
+ 
++Начиная с Stage 3 F10 команда RTD в интерактивном shell сначала **подготавливает**
++задачу и не запускает её немедленно. Можно ввести несколько команд RTD подряд,
++а затем нажать `F10`; все подготовленные задачи запускаются последовательно
++через штатный `RTD.EXE` и работают одновременно. Максимум — четыре подготовленные
++задачи.
++
+ Пример:
+ 
+ ```text
+ exec RTD.EXE SENSOR.EXE 20 20 3
+ exec RTD.EXE SENSOR.EXE 40 40 7
++exec RTD.EXE SENSOR.EXE 100 100 3
++F10
+ ```
+ 
+ Обе программы остаются обычными EXE1. Периодические release/deadline state
+-ведутся независимо. `ESC` адресуется текущей RT-задаче. Ограничение — четыре
+-одновременно активных RT-задачи.
++ведутся независимо. `ESC` адресуется текущей RT-задаче.
+ 
+ Priority arbitration между несколькими готовыми RT-задачами намеренно не
+-перенесён в Stage 3: здесь добавляется именно многозадачность; отдельный
+-следующий этап может изменить выбор готовой задачи на fixed-priority policy.
++перенесён в Stage 3: здесь добавляется именно многозадачность и отложенный
++старт. Отдельный следующий этап может изменить выбор готовой задачи на
++fixed-priority policy.
+ 
+-Подробности: `RELEASE_NOTES_V67_RTD_STAGE3_RU.md` и
+-`TEST_PLAN_V67_RTD_STAGE3_RU.md`.
++Подробности текущих изменений: `changes/RTD/Stage3_F10/`.
+ 
+ ## RTD change documentation
+ 
+--- /tmp/toyos_fix4_base/changes/RTD/README_RU.md	2026-09-18 08:47:52.000000000 +0000
++++ changes/RTD/README_RU.md	2026-09-18 09:01:47.172727306 +0000
+@@ -13,6 +13,7 @@
+   Stage3_FIX2/
+   Stage3_FIX3/
+   Stage3_FIX4/
++  Stage3_F10/
+ ```
+ 
+ Каждая версия/исправление содержит release notes, план тестирования, результаты проверки и patch, когда он применим.
+--- /dev/null
++++ check_rtd_stage3_f10.sh
+@@ -0,0 +1,21 @@
++#!/bin/sh
++set -eu
++fail=0
++ok(){ echo "PASS: $1"; }
++bad(){ echo "FAIL: $1"; fail=1; }
++
++grep -q '#define KEY_EVENT_F10 0xf0u' src/kernel.c && ok 'F10 internal event code' || bad 'missing F10 event code'
++grep -q 'if(s==0x44){key_push(KEY_EVENT_F10);return;}' src/kernel.c && ok 'PS/2 Set-1 F10 scancode 0x44' || bad 'F10 scancode handler missing'
++grep -q 'if(ch==KEY_EVENT_F10).*f->eax=4u' src/kernel.c && ok 'SYS_CONSOLE_READ returns F10 event' || bad 'F10 read result missing'
++grep -q '#define SHELL_READ_F10 4u' src/user_shell.c && ok 'shell F10 result code' || bad 'shell F10 result missing'
++grep -q 'shell_f10_event=1u' src/user_shell.c && ok 'readline reports F10 to shell loop' || bad 'readline F10 event missing'
++grep -q 'RTD: task prepared' src/user_shell.c && ok 'RTD command is queued instead of started immediately' || bad 'RTD queueing message missing'
++grep -q 'pending_rt_args' src/user_shell.c && ok 'pending RT argument storage' || bad 'pending RT storage missing'
++if awk '/static void exec_rtd_command/{infn=1;next} /static void rt_launch_pending/{infn=0} infn && /sys_exec_args\(\"\/RTD.EXE\"/{found=1} END{exit(found?0:1)}' src/user_shell.c; then bad 'RTD still starts immediately from exec_rtd_command'; else ok 'exec_rtd_command does not launch RTD immediately'; fi
++grep -q 'rt_launch_pending' src/user_shell.c && ok 'F10 launch path exists' || bad 'F10 launch path missing'
++grep -q 'if(shell_f10_event){rt_launch_pending();continue;}' src/user_shell.c && ok 'shell loop launches pending tasks on F10' || bad 'shell F10 launch integration missing'
++if [ "$fail" -ne 0 ]; then exit 1; fi
++echo 'RTD Stage 3 F10 checks passed'

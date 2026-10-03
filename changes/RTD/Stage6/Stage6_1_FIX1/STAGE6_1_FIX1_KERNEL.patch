@@ -1,0 +1,19 @@
+diff --git a/tmp/toyos_stage6/src/kernel.c b/src/kernel.c
+index 1ba2f2e..3562ef9 100644
+--- a/tmp/toyos_stage6/src/kernel.c
++++ b/src/kernel.c
+@@ -2194,6 +2194,14 @@ static void sched_irq_tick(struct frame*f){
+     int next;
+     if(!sched_active&&!rt_background_active)return;
+     if(rt_background_active&&!sched_active){
++        /* Stage 6.1 FIX1: never context-switch a detached RT task from an
++           IRQ0 that interrupted Ring-0.  At 100 Hz the probability of an IRQ
++           landing inside SYS_* handlers is doubled; copying a transient
++           kernel frame into a user task context can otherwise resume at the
++           wrong EIP/ESP or return from a syscall twice.  Blocking syscalls
++           (SYS_CONSOLE_READ/SYS_RT_WAIT) perform their own safe user-context
++           dispatch, while user-mode IRQ0 remains preemptible. */
++        if((f->cs&3u)==0u)return;
+         uint32_t now=rt_time_ticks;
+         int current;
+         rt_release_jobs(now);

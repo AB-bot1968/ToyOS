@@ -1,0 +1,28 @@
+diff --git a/tmp/toyos_s52fix1/stage52_fix1/src/rtd.c b/src/rtd.c
+index 14f6cbc..22f2a8e 100644
+--- a/tmp/toyos_s52fix1/stage52_fix1/src/rtd.c
++++ b/src/rtd.c
+@@ -16,6 +16,7 @@ typedef unsigned int uint32_t;
+ #define SYS_EXIT          12u
+ #define SYS_EXEC_ARG      34u
+ #define SYS_RT_START      38u
++#define SYS_RT_STATUS     43u
+ #define EXEC_ARG_SIZE     16u
+ #define EXEC_ARG_COUNT    3u
+ #define QUEUE_NAME_SIZE   13u
+@@ -88,7 +89,14 @@ __attribute__((section(".usertext"))) void program_main(void){
+     }
+     r=syscall3(SYS_RT_START,(uint32_t)&req,0,0);
+     if(r!=0u){
+-        put("RTD: start FAIL code=");put_u32(r);put("\n");
++        put("RTD: start FAIL code=");put_u32(r);
++        if(r==0xffffffffu){
++            uint32_t st[4];
++            if(syscall3(SYS_RT_STATUS,(uint32_t)st,0,0)==0u){
++                put(" active=");put_u32(st[0]);put(" free=");put_u32(st[1]);
++            }
++        }
++        put("\n");
+         syscall3(SYS_EXIT,1,0,0);
+         for(;;){}
+     }

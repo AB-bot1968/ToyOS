@@ -1,0 +1,61 @@
+# FIX40A logical keyboard-path regression.
+# TYPE stages the same shell command text; KEY ENTER submits it through the
+# normal command dispatcher; KEY F10 invokes the same pending-RT launch handler.
+# Scheduler admission uses minimal SENSOR.EXE; SENSOR1..8 telemetry is tested separately.
+PRINT FIX60E KEY ISOLATION PRE-CLEAN
+RUN mtstop ALL
+RUN rtstat stop
+RUN rtstat reset
+RUN hwwd disarm
+RUN safemode normal 0
+ASSERT RT_ACTIVE 0
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+ASSERT SAFE_MODE 0
+ASSERT HWWD_ARMED 0
+ASSERT HEALTH_STATE 0
+PRINT FIX60ZE KEY ENTER/F10 4MT + 1RT PATH TEST
+ASSERT RT_ACTIVE 0
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+TYPE execmt MT01.EXE MT02.EXE MT03.EXE MT04.EXE
+KEY ENTER
+# FIX60ZED: F10 on a fully typed RTD line must submit that line, then launch.
+TYPE exec RTD.EXE SENSOR.EXE 100 100 1
+KEY F10
+ASSERT MT_ACTIVE 4
+ASSERT RT_ACTIVE 1
+RUN mtstat
+RUN rtstat
+RUN rtstat stop
+RUN mtstop ALL
+RUN rtstat reset
+ASSERT RT_ACTIVE 0
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+PRINT KEY LOAD TEST COMPLETE
+# Spawn/argv through TYPE + KEY ENTER.  Verify the actual MTDATA payload, not only exit status.
+TYPE spawn ARGVDIAG.EXE ONE TWO THREE
+KEY ENTER
+WAIT LAST
+ASSERT LAST_REASON 1
+ASSERT LAST_STATUS 0
+ASSERT LAST_MTDATA ARGV:ARGVDIAG.EXE|ONE|TWO|THREE
+# Ring3 exception containment through the same logical keyboard path.
+TYPE spawn FAULTUD.EXE
+KEY ENTER
+WAIT LAST
+ASSERT LAST_REASON 2
+TYPE spawn FAULTGP.EXE
+KEY ENTER
+WAIT LAST
+ASSERT LAST_REASON 2
+TYPE spawn FAULTPF.EXE
+KEY ENTER
+WAIT LAST
+ASSERT LAST_REASON 2
+RUN mtstop ALL
+ASSERT RT_ACTIVE 0
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+PRINT KEY SPAWN/ARGV/FAULT TEST COMPLETE

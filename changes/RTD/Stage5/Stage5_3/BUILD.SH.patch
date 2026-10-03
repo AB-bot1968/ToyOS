@@ -1,0 +1,44 @@
+--- a/build.sh	2026-09-18 13:28:47.000000000 +0000
++++ b/build.sh	2026-09-18 13:56:04.939719854 +0000
+@@ -66,6 +66,7 @@
+ gcc $CFLAGS -DRT_SENSOR_DIAG_ID=2 -c src/rt_sensor_diag.c -o build/rt_sensor2.o
+ gcc $CFLAGS -c src/rt_deadline_diag.c -o build/rt_deadline_diag.o
+ gcc $CFLAGS -c src/rt_deadline_miss_diag.c -o build/rt_deadline_miss_diag.o
++gcc $CFLAGS -c src/rt_period_skip_diag.c -o build/rt_period_skip_diag.o
+ 
+ # Additional EXE1 queue-validation programs. Each is linked independently at
+ # the same user image address because the kernel executes queue members
+@@ -214,6 +215,9 @@
+ ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_deadline_miss_diag.pe build/rt_deadline_miss_diag.o
+ objcopy --only-section=.text -O binary build/rt_deadline_miss_diag.pe build/rt_deadline_miss_diag.raw
+ make_exe1 build/rt_deadline_miss_diag.raw build/RTDMISS.EXE 0
++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_period_skip_diag.pe build/rt_period_skip_diag.o
++objcopy --only-section=.text -O binary build/rt_period_skip_diag.pe build/rt_period_skip_diag.raw
++make_exe1 build/rt_period_skip_diag.raw build/RTDSKIP.EXE 0
+ # Тестовый графический ресурс: чистый RAW 320x200x256, ровно 64000 байт.
+ # Важно: mkfat16 ниже получает все входные файлы из каталога build/.
+ # Поэтому ресурс сначала явно копируется из исходного каталога resources/
+@@ -268,13 +272,13 @@
+     mtid=`printf '%02d' "$i"`
+     EXECMT_FILES="$EXECMT_FILES build/MT${mtid}.EXE"
+ done
+-./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/DEADLINE.EXE=DEADLINE.EXE build/RTDMISS.EXE=RTDMISS.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
++./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/DEADLINE.EXE=DEADLINE.EXE build/RTDMISS.EXE=RTDMISS.EXE build/RTDSKIP.EXE=RTDSKIP.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
+ 
+ test -s build/disk.img || { echo "ERROR: mkfat16 finished without creating build/disk.img" >&2; exit 1; }
+ echo "[FAT16] disk.img created: `wc -c < build/disk.img | tr -d ' '` bytes"
+ 
+ # Verify every shipped EXE1 entry before writing the boot sector/kernel.
+-for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE DEADLINE.EXE RTDMISS.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
++for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE DEADLINE.EXE RTDMISS.EXE RTDSKIP.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
+     ./build/fat16check.exe build/disk.img "$qname"
+ done
+ if [ -f build/AUTOSTART.SH ]; then
+@@ -363,6 +367,7 @@
+ sh ./check_rtd_stage5_2.sh
+ ./check_rtd_stage5_2_fix1.sh
+ ./check_rtd_stage5_2_fix2.sh
++./check_rtd_stage5_3.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh

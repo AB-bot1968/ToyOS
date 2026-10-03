@@ -1,0 +1,3 @@
+# ToyOS FIX60ZEI frozen baseline: preserve exact bytes on every platform.
+# Do not let core.autocrlf or checkout rules rewrite line endings.
+* -text

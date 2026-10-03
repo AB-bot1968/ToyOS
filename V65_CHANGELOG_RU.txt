@@ -1,0 +1,18 @@
+Toy OS v65.9
+
+Исправлен возврат VGADRV из VGA Mode 13h в текстовый режим 80x25.
+Причина предыдущих артефактов: Mode 13h с Chain-4 изменяет VGA plane 2,
+где хранится bitmap-шрифт text mode, а восстановление text mode использовало
+неверное значение Sequencer Memory Mode.
+
+Теперь kernel:
+- сохраняет исходный BIOS/VGA 8x16 font (4096 байт) до первого graphics mode;
+- восстанавливает стандартный VGA mode 03h;
+- восстанавливает font plane 2;
+- только после этого очищает B8000 и обновляет cursor.
+
+SPLASH.RAW остаётся обычным FAT16-файлом 320x200x256 (64000 байт).
+
+v65.13 — исправлен tools/PNG2RAW: удалён System.Drawing.Bitmap и Stream.CopyTo;
+PNG декодируется напрямую через PNG chunks + DeflateStream, что повышает
+совместимость с Windows 7 и старым .NET.

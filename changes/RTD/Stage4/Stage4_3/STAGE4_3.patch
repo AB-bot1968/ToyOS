@@ -1,0 +1,1485 @@
+diff -ruN /tmp/st43base/toyos_stage42/build/AUTOSTART.SH /tmp/st42/toyos_stage42/build/AUTOSTART.SH
+--- /tmp/st43base/toyos_stage42/build/AUTOSTART.SH	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/build/AUTOSTART.SH	2026-09-18 10:18:51.249240071 +0000
+@@ -0,0 +1 @@
++exec VGADRV.EXE SPLASH.RAW
+Binary files /tmp/st43base/toyos_stage42/build/COMDRV.EXE and /tmp/st42/toyos_stage42/build/COMDRV.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/HELLO.EXE and /tmp/st42/toyos_stage42/build/HELLO.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/LOADER.EXE and /tmp/st42/toyos_stage42/build/LOADER.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT01.EXE and /tmp/st42/toyos_stage42/build/MT01.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT02.EXE and /tmp/st42/toyos_stage42/build/MT02.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT03.EXE and /tmp/st42/toyos_stage42/build/MT03.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT04.EXE and /tmp/st42/toyos_stage42/build/MT04.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT05.EXE and /tmp/st42/toyos_stage42/build/MT05.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT06.EXE and /tmp/st42/toyos_stage42/build/MT06.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT07.EXE and /tmp/st42/toyos_stage42/build/MT07.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT08.EXE and /tmp/st42/toyos_stage42/build/MT08.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT09.EXE and /tmp/st42/toyos_stage42/build/MT09.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT10.EXE and /tmp/st42/toyos_stage42/build/MT10.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT11.EXE and /tmp/st42/toyos_stage42/build/MT11.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT12.EXE and /tmp/st42/toyos_stage42/build/MT12.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT13.EXE and /tmp/st42/toyos_stage42/build/MT13.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT14.EXE and /tmp/st42/toyos_stage42/build/MT14.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT15.EXE and /tmp/st42/toyos_stage42/build/MT15.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT16.EXE and /tmp/st42/toyos_stage42/build/MT16.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT17.EXE and /tmp/st42/toyos_stage42/build/MT17.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT18.EXE and /tmp/st42/toyos_stage42/build/MT18.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT19.EXE and /tmp/st42/toyos_stage42/build/MT19.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT20.EXE and /tmp/st42/toyos_stage42/build/MT20.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT21.EXE and /tmp/st42/toyos_stage42/build/MT21.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT22.EXE and /tmp/st42/toyos_stage42/build/MT22.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT23.EXE and /tmp/st42/toyos_stage42/build/MT23.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT24.EXE and /tmp/st42/toyos_stage42/build/MT24.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/MT25.EXE and /tmp/st42/toyos_stage42/build/MT25.EXE differ
+diff -ruN /tmp/st43base/toyos_stage42/build/NET.CFG /tmp/st42/toyos_stage42/build/NET.CFG
+--- /tmp/st43base/toyos_stage42/build/NET.CFG	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/build/NET.CFG	2026-09-18 10:18:48.156377496 +0000
+@@ -0,0 +1,10 @@
++# NETDRV.EXE v58 — конфигурация QEMU user-mode networking + NE2000 ISA
++# Все значения ASCII. Пустые строки и строки с # игнорируются.
++BASE=300
++MAC=52:54:00:12:34:56
++IP=10.0.2.15
++MASK=255.255.255.0
++GATEWAY=10.0.2.2
++PORT=8080
++PATH=/
++TIMEOUT=10
+Binary files /tmp/st43base/toyos_stage42/build/NETDRV.EXE and /tmp/st42/toyos_stage42/build/NETDRV.EXE differ
+diff -ruN /tmp/st43base/toyos_stage42/build/NET_MAST.CFG /tmp/st42/toyos_stage42/build/NET_MAST.CFG
+--- /tmp/st43base/toyos_stage42/build/NET_MAST.CFG	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/build/NET_MAST.CFG	2026-09-18 10:18:48.157207557 +0000
+@@ -0,0 +1,11 @@
++# Toy OS v66.3 — MASTER для маршрутизируемой Wi-Fi сети без L2 bridge.
++# Виртуальная подсеть ПК №1: 10.66.1.0/24.
++# 10.66.1.1 — IP Windows на TAP tap0; 10.66.1.2 — Toy OS Master.
++BASE=300
++MAC=52:54:00:10:66:10
++IP=10.66.1.2
++MASK=255.255.255.0
++GATEWAY=10.66.1.1
++PORT=8080
++PATH=/
++TIMEOUT=10
+diff -ruN /tmp/st43base/toyos_stage42/build/NET_SLV1.CFG /tmp/st42/toyos_stage42/build/NET_SLV1.CFG
+--- /tmp/st43base/toyos_stage42/build/NET_SLV1.CFG	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/build/NET_SLV1.CFG	2026-09-18 10:18:48.158029335 +0000
+@@ -0,0 +1,11 @@
++# Toy OS v66.3 — SLAVE1 для маршрутизируемой Wi-Fi сети без L2 bridge.
++# Виртуальная подсеть ПК №2: 10.66.2.0/24.
++# 10.66.2.1 — IP Windows на TAP tap0; 10.66.2.2 — Toy OS Slave1.
++BASE=300
++MAC=52:54:00:10:66:11
++IP=10.66.2.2
++MASK=255.255.255.0
++GATEWAY=10.66.2.1
++PORT=8080
++PATH=/
++TIMEOUT=10
+diff -ruN /tmp/st43base/toyos_stage42/build/NET_SLV2.CFG /tmp/st42/toyos_stage42/build/NET_SLV2.CFG
+--- /tmp/st43base/toyos_stage42/build/NET_SLV2.CFG	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/build/NET_SLV2.CFG	2026-09-18 10:18:48.158915961 +0000
+@@ -0,0 +1,11 @@
++# Toy OS v66.3 — SLAVE2 для маршрутизируемой Wi-Fi сети без L2 bridge.
++# Виртуальная подсеть ПК №2: 10.66.2.0/24.
++# 10.66.2.1 — IP Windows на TAP tap0; 10.66.2.3 — Toy OS Slave2.
++BASE=300
++MAC=52:54:00:10:66:12
++IP=10.66.2.3
++MASK=255.255.255.0
++GATEWAY=10.66.2.1
++PORT=8080
++PATH=/
++TIMEOUT=10
+Binary files /tmp/st43base/toyos_stage42/build/QFILE.EXE and /tmp/st42/toyos_stage42/build/QFILE.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/QFROMEXE.EXE and /tmp/st42/toyos_stage42/build/QFROMEXE.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/QNESTED.EXE and /tmp/st42/toyos_stage42/build/QNESTED.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/QPASS.EXE and /tmp/st42/toyos_stage42/build/QPASS.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/QPORT.EXE and /tmp/st42/toyos_stage42/build/QPORT.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/QSIZE.EXE and /tmp/st42/toyos_stage42/build/QSIZE.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/QSTOP.EXE and /tmp/st42/toyos_stage42/build/QSTOP.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/RTD.EXE and /tmp/st42/toyos_stage42/build/RTD.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/SENSOR.EXE and /tmp/st42/toyos_stage42/build/SENSOR.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/SENSOR1.EXE and /tmp/st42/toyos_stage42/build/SENSOR1.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/SENSOR2.EXE and /tmp/st42/toyos_stage42/build/SENSOR2.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/SPLASH.RAW and /tmp/st42/toyos_stage42/build/SPLASH.RAW differ
+Binary files /tmp/st43base/toyos_stage42/build/VGADRV.EXE and /tmp/st42/toyos_stage42/build/VGADRV.EXE differ
+Binary files /tmp/st43base/toyos_stage42/build/boot.bin and /tmp/st42/toyos_stage42/build/boot.bin differ
+Binary files /tmp/st43base/toyos_stage42/build/boot.o and /tmp/st42/toyos_stage42/build/boot.o differ
+Binary files /tmp/st43base/toyos_stage42/build/boot.pe and /tmp/st42/toyos_stage42/build/boot.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/comdrv.o and /tmp/st42/toyos_stage42/build/comdrv.o differ
+Binary files /tmp/st43base/toyos_stage42/build/comdrv.pe and /tmp/st42/toyos_stage42/build/comdrv.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/comdrv.raw and /tmp/st42/toyos_stage42/build/comdrv.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/disk.img and /tmp/st42/toyos_stage42/build/disk.img differ
+Binary files /tmp/st43base/toyos_stage42/build/fat16check.exe and /tmp/st42/toyos_stage42/build/fat16check.exe differ
+Binary files /tmp/st43base/toyos_stage42/build/hello.o and /tmp/st42/toyos_stage42/build/hello.o differ
+Binary files /tmp/st43base/toyos_stage42/build/hello.pe and /tmp/st42/toyos_stage42/build/hello.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/hello.raw and /tmp/st42/toyos_stage42/build/hello.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/isr.o and /tmp/st42/toyos_stage42/build/isr.o differ
+Binary files /tmp/st43base/toyos_stage42/build/kernel.bin and /tmp/st42/toyos_stage42/build/kernel.bin differ
+Binary files /tmp/st43base/toyos_stage42/build/kernel.coff.o and /tmp/st42/toyos_stage42/build/kernel.coff.o differ
+Binary files /tmp/st43base/toyos_stage42/build/kernel.o and /tmp/st42/toyos_stage42/build/kernel.o differ
+Binary files /tmp/st43base/toyos_stage42/build/kernel.pe and /tmp/st42/toyos_stage42/build/kernel.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/loader.o and /tmp/st42/toyos_stage42/build/loader.o differ
+Binary files /tmp/st43base/toyos_stage42/build/loader.pe and /tmp/st42/toyos_stage42/build/loader.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/loader.raw and /tmp/st42/toyos_stage42/build/loader.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mkexe.exe and /tmp/st42/toyos_stage42/build/mkexe.exe differ
+Binary files /tmp/st43base/toyos_stage42/build/mkfat16.exe and /tmp/st42/toyos_stage42/build/mkfat16.exe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt01.o and /tmp/st42/toyos_stage42/build/mt01.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt01.pe and /tmp/st42/toyos_stage42/build/mt01.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt01.raw and /tmp/st42/toyos_stage42/build/mt01.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt02.o and /tmp/st42/toyos_stage42/build/mt02.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt02.pe and /tmp/st42/toyos_stage42/build/mt02.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt02.raw and /tmp/st42/toyos_stage42/build/mt02.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt03.o and /tmp/st42/toyos_stage42/build/mt03.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt03.pe and /tmp/st42/toyos_stage42/build/mt03.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt03.raw and /tmp/st42/toyos_stage42/build/mt03.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt04.o and /tmp/st42/toyos_stage42/build/mt04.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt04.pe and /tmp/st42/toyos_stage42/build/mt04.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt04.raw and /tmp/st42/toyos_stage42/build/mt04.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt05.o and /tmp/st42/toyos_stage42/build/mt05.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt05.pe and /tmp/st42/toyos_stage42/build/mt05.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt05.raw and /tmp/st42/toyos_stage42/build/mt05.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt06.o and /tmp/st42/toyos_stage42/build/mt06.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt06.pe and /tmp/st42/toyos_stage42/build/mt06.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt06.raw and /tmp/st42/toyos_stage42/build/mt06.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt07.o and /tmp/st42/toyos_stage42/build/mt07.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt07.pe and /tmp/st42/toyos_stage42/build/mt07.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt07.raw and /tmp/st42/toyos_stage42/build/mt07.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt08.o and /tmp/st42/toyos_stage42/build/mt08.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt08.pe and /tmp/st42/toyos_stage42/build/mt08.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt08.raw and /tmp/st42/toyos_stage42/build/mt08.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt09.o and /tmp/st42/toyos_stage42/build/mt09.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt09.pe and /tmp/st42/toyos_stage42/build/mt09.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt09.raw and /tmp/st42/toyos_stage42/build/mt09.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt10.o and /tmp/st42/toyos_stage42/build/mt10.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt10.pe and /tmp/st42/toyos_stage42/build/mt10.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt10.raw and /tmp/st42/toyos_stage42/build/mt10.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt11.o and /tmp/st42/toyos_stage42/build/mt11.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt11.pe and /tmp/st42/toyos_stage42/build/mt11.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt11.raw and /tmp/st42/toyos_stage42/build/mt11.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt12.o and /tmp/st42/toyos_stage42/build/mt12.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt12.pe and /tmp/st42/toyos_stage42/build/mt12.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt12.raw and /tmp/st42/toyos_stage42/build/mt12.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt13.o and /tmp/st42/toyos_stage42/build/mt13.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt13.pe and /tmp/st42/toyos_stage42/build/mt13.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt13.raw and /tmp/st42/toyos_stage42/build/mt13.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt14.o and /tmp/st42/toyos_stage42/build/mt14.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt14.pe and /tmp/st42/toyos_stage42/build/mt14.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt14.raw and /tmp/st42/toyos_stage42/build/mt14.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt15.o and /tmp/st42/toyos_stage42/build/mt15.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt15.pe and /tmp/st42/toyos_stage42/build/mt15.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt15.raw and /tmp/st42/toyos_stage42/build/mt15.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt16.o and /tmp/st42/toyos_stage42/build/mt16.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt16.pe and /tmp/st42/toyos_stage42/build/mt16.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt16.raw and /tmp/st42/toyos_stage42/build/mt16.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt17.o and /tmp/st42/toyos_stage42/build/mt17.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt17.pe and /tmp/st42/toyos_stage42/build/mt17.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt17.raw and /tmp/st42/toyos_stage42/build/mt17.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt18.o and /tmp/st42/toyos_stage42/build/mt18.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt18.pe and /tmp/st42/toyos_stage42/build/mt18.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt18.raw and /tmp/st42/toyos_stage42/build/mt18.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt19.o and /tmp/st42/toyos_stage42/build/mt19.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt19.pe and /tmp/st42/toyos_stage42/build/mt19.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt19.raw and /tmp/st42/toyos_stage42/build/mt19.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt20.o and /tmp/st42/toyos_stage42/build/mt20.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt20.pe and /tmp/st42/toyos_stage42/build/mt20.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt20.raw and /tmp/st42/toyos_stage42/build/mt20.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt21.o and /tmp/st42/toyos_stage42/build/mt21.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt21.pe and /tmp/st42/toyos_stage42/build/mt21.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt21.raw and /tmp/st42/toyos_stage42/build/mt21.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt22.o and /tmp/st42/toyos_stage42/build/mt22.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt22.pe and /tmp/st42/toyos_stage42/build/mt22.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt22.raw and /tmp/st42/toyos_stage42/build/mt22.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt23.o and /tmp/st42/toyos_stage42/build/mt23.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt23.pe and /tmp/st42/toyos_stage42/build/mt23.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt23.raw and /tmp/st42/toyos_stage42/build/mt23.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt24.o and /tmp/st42/toyos_stage42/build/mt24.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt24.pe and /tmp/st42/toyos_stage42/build/mt24.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt24.raw and /tmp/st42/toyos_stage42/build/mt24.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/mt25.o and /tmp/st42/toyos_stage42/build/mt25.o differ
+Binary files /tmp/st43base/toyos_stage42/build/mt25.pe and /tmp/st42/toyos_stage42/build/mt25.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/mt25.raw and /tmp/st42/toyos_stage42/build/mt25.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/netdrv.o and /tmp/st42/toyos_stage42/build/netdrv.o differ
+Binary files /tmp/st43base/toyos_stage42/build/netdrv.pe and /tmp/st42/toyos_stage42/build/netdrv.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/netdrv.raw and /tmp/st42/toyos_stage42/build/netdrv.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/path.o and /tmp/st42/toyos_stage42/build/path.o differ
+Binary files /tmp/st43base/toyos_stage42/build/pathcheck.exe and /tmp/st42/toyos_stage42/build/pathcheck.exe differ
+Binary files /tmp/st43base/toyos_stage42/build/png2raw.exe and /tmp/st42/toyos_stage42/build/png2raw.exe differ
+Binary files /tmp/st43base/toyos_stage42/build/qfile.o and /tmp/st42/toyos_stage42/build/qfile.o differ
+Binary files /tmp/st43base/toyos_stage42/build/qfile.pe and /tmp/st42/toyos_stage42/build/qfile.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/qfile.raw and /tmp/st42/toyos_stage42/build/qfile.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/qfromexe.o and /tmp/st42/toyos_stage42/build/qfromexe.o differ
+Binary files /tmp/st43base/toyos_stage42/build/qfromexe.pe and /tmp/st42/toyos_stage42/build/qfromexe.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/qfromexe.raw and /tmp/st42/toyos_stage42/build/qfromexe.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/qnested.o and /tmp/st42/toyos_stage42/build/qnested.o differ
+Binary files /tmp/st43base/toyos_stage42/build/qnested.pe and /tmp/st42/toyos_stage42/build/qnested.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/qnested.raw and /tmp/st42/toyos_stage42/build/qnested.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/qpass.o and /tmp/st42/toyos_stage42/build/qpass.o differ
+Binary files /tmp/st43base/toyos_stage42/build/qpass.pe and /tmp/st42/toyos_stage42/build/qpass.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/qpass.raw and /tmp/st42/toyos_stage42/build/qpass.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/qport.o and /tmp/st42/toyos_stage42/build/qport.o differ
+Binary files /tmp/st43base/toyos_stage42/build/qport.pe and /tmp/st42/toyos_stage42/build/qport.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/qport.raw and /tmp/st42/toyos_stage42/build/qport.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/qsize.o and /tmp/st42/toyos_stage42/build/qsize.o differ
+Binary files /tmp/st43base/toyos_stage42/build/qsize.pe and /tmp/st42/toyos_stage42/build/qsize.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/qsize.raw and /tmp/st42/toyos_stage42/build/qsize.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/qstop.o and /tmp/st42/toyos_stage42/build/qstop.o differ
+Binary files /tmp/st43base/toyos_stage42/build/qstop.pe and /tmp/st42/toyos_stage42/build/qstop.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/qstop.raw and /tmp/st42/toyos_stage42/build/qstop.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor.o and /tmp/st42/toyos_stage42/build/rt_sensor.o differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor.pe and /tmp/st42/toyos_stage42/build/rt_sensor.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor.raw and /tmp/st42/toyos_stage42/build/rt_sensor.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor1.o and /tmp/st42/toyos_stage42/build/rt_sensor1.o differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor1.pe and /tmp/st42/toyos_stage42/build/rt_sensor1.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor1.raw and /tmp/st42/toyos_stage42/build/rt_sensor1.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor2.o and /tmp/st42/toyos_stage42/build/rt_sensor2.o differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor2.pe and /tmp/st42/toyos_stage42/build/rt_sensor2.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/rt_sensor2.raw and /tmp/st42/toyos_stage42/build/rt_sensor2.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/rtd.o and /tmp/st42/toyos_stage42/build/rtd.o differ
+Binary files /tmp/st43base/toyos_stage42/build/rtd.pe and /tmp/st42/toyos_stage42/build/rtd.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/rtd.raw and /tmp/st42/toyos_stage42/build/rtd.raw differ
+Binary files /tmp/st43base/toyos_stage42/build/toy_os.img and /tmp/st42/toyos_stage42/build/toy_os.img differ
+Binary files /tmp/st43base/toyos_stage42/build/user_shell.o and /tmp/st42/toyos_stage42/build/user_shell.o differ
+Binary files /tmp/st43base/toyos_stage42/build/vgadrv.o and /tmp/st42/toyos_stage42/build/vgadrv.o differ
+Binary files /tmp/st43base/toyos_stage42/build/vgadrv.pe and /tmp/st42/toyos_stage42/build/vgadrv.pe differ
+Binary files /tmp/st43base/toyos_stage42/build/vgadrv.raw and /tmp/st42/toyos_stage42/build/vgadrv.raw differ
+diff -ruN /tmp/st43base/toyos_stage42/build.sh /tmp/st42/toyos_stage42/build.sh
+--- /tmp/st43base/toyos_stage42/build.sh	2026-09-18 10:05:48.000000000 +0000
++++ /tmp/st42/toyos_stage42/build.sh	2026-09-18 10:18:43.248512905 +0000
+@@ -62,6 +62,8 @@
+ # application binaries.
+ gcc $CFLAGS -c src/rtd.c -o build/rtd.o
+ gcc $CFLAGS -c src/rt_sensor.c -o build/rt_sensor.o
++gcc $CFLAGS -DRT_SENSOR_DIAG_ID=1 -c src/rt_sensor_diag.c -o build/rt_sensor1.o
++gcc $CFLAGS -DRT_SENSOR_DIAG_ID=2 -c src/rt_sensor_diag.c -o build/rt_sensor2.o
+ 
+ # Additional EXE1 queue-validation programs. Each is linked independently at
+ # the same user image address because the kernel executes queue members
+@@ -198,6 +200,12 @@
+ ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor.pe build/rt_sensor.o
+ objcopy --only-section=.text -O binary build/rt_sensor.pe build/rt_sensor.raw
+ make_exe1 build/rt_sensor.raw build/SENSOR.EXE 0
++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor1.pe build/rt_sensor1.o
++objcopy --only-section=.text -O binary build/rt_sensor1.pe build/rt_sensor1.raw
++make_exe1 build/rt_sensor1.raw build/SENSOR1.EXE 0
++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor2.pe build/rt_sensor2.o
++objcopy --only-section=.text -O binary build/rt_sensor2.pe build/rt_sensor2.raw
++make_exe1 build/rt_sensor2.raw build/SENSOR2.EXE 0
+ # Тестовый графический ресурс: чистый RAW 320x200x256, ровно 64000 байт.
+ # Важно: mkfat16 ниже получает все входные файлы из каталога build/.
+ # Поэтому ресурс сначала явно копируется из исходного каталога resources/
+@@ -252,13 +260,13 @@
+     mtid=`printf '%02d' "$i"`
+     EXECMT_FILES="$EXECMT_FILES build/MT${mtid}.EXE"
+ done
+-./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
++./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
+ 
+ test -s build/disk.img || { echo "ERROR: mkfat16 finished without creating build/disk.img" >&2; exit 1; }
+ echo "[FAT16] disk.img created: `wc -c < build/disk.img | tr -d ' '` bytes"
+ 
+ # Verify every shipped EXE1 entry before writing the boot sector/kernel.
+-for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
++for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
+     ./build/fat16check.exe build/disk.img "$qname"
+ done
+ if [ -f build/AUTOSTART.SH ]; then
+@@ -340,6 +348,7 @@
+ sh ./check_rtd_stage3_f10.sh
+ sh ./check_rtd_stage4_1.sh
+ sh ./check_rtd_stage4_2.sh
++sh ./check_rtd_stage4_3.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md
+--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md	2026-09-18 10:18:43.422830121 +0000
+@@ -0,0 +1,18 @@
++# Состав архива Stage 4.3
++
++База: `ToyOS v67 RTD Stage 4.2`.
++
++Новые файлы:
++
++- `src/rt_sensor_diag.c`
++- `check_rtd_stage4_3.sh`
++- `tools/test_rtd_stage4_3.c`
++- `changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md`
++- `changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md`
++- `changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md`
++- `changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md`
++- `changes/RTD/Stage4/Stage4_3/STAGE4_3.patch`
++
++Изменён: `build.sh`.
++
++`build/` в исходный архив не включается.
+diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md
+--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md	2026-09-18 10:18:43.420184124 +0000
+@@ -0,0 +1,26 @@
++# ToyOS v67 RTD Stage 4.3 — SENSOR1/SENSOR2 для наблюдения параллельного RT
++
++## Цель
++
++Stage 4.3 добавляет два диагностических бинарника `SENSOR1.EXE` и `SENSOR2.EXE`.
++Они нужны для наблюдения нескольких одновременно работающих RT-задач и для
++проверки ранее реализованного priority arbitration.
++
++## Пошаговые изменения
++
++1. Добавлен единый исходник `src/rt_sensor_diag.c`.
++2. Исходник компилируется два раза с `RT_SENSOR_DIAG_ID=1` и `=2`.
++3. Получаются два независимых обычных EXE1: `SENSOR1.EXE` и `SENSOR2.EXE`.
++4. `SENSOR1.EXE` выводит строки с префиксом `SENSOR1:`.
++5. `SENSOR2.EXE` выводит строки с префиксом `SENSOR2:`.
++6. Оба бинарника используют только существующие syscall `SYS_RT_INFO`,
++   `SYS_CONSOLE_POLL`, `SYS_RT_WAIT` и `SYS_EXIT`.
++7. Добавлены отдельные записи сборки и FAT16 для обоих файлов.
++8. Добавлен `check_rtd_stage4_3.sh` и host-test
++   `tools/test_rtd_stage4_3.c`.
++
++## Что не меняется
++
++`rt_priority_compare()` и `rt_pick_ready()` остаются реализацией Stage 4.2.
++Stage 4.3 не меняет scheduler, F10, ESC, shell context, `SYS_RT_WAIT`,
++period/deadline или EXE1 ABI.
+diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch
+--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch	2026-09-18 10:18:43.472850989 +0000
+@@ -0,0 +1,933 @@
++diff -ruN /tmp/st43base/toyos_stage42/build.sh /tmp/st42/toyos_stage42/build.sh
++--- /tmp/st43base/toyos_stage42/build.sh	2026-09-18 10:05:48.000000000 +0000
+++++ /tmp/st42/toyos_stage42/build.sh	2026-09-18 10:18:43.248512905 +0000
++@@ -62,6 +62,8 @@
++ # application binaries.
++ gcc $CFLAGS -c src/rtd.c -o build/rtd.o
++ gcc $CFLAGS -c src/rt_sensor.c -o build/rt_sensor.o
+++gcc $CFLAGS -DRT_SENSOR_DIAG_ID=1 -c src/rt_sensor_diag.c -o build/rt_sensor1.o
+++gcc $CFLAGS -DRT_SENSOR_DIAG_ID=2 -c src/rt_sensor_diag.c -o build/rt_sensor2.o
++ 
++ # Additional EXE1 queue-validation programs. Each is linked independently at
++ # the same user image address because the kernel executes queue members
++@@ -198,6 +200,12 @@
++ ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor.pe build/rt_sensor.o
++ objcopy --only-section=.text -O binary build/rt_sensor.pe build/rt_sensor.raw
++ make_exe1 build/rt_sensor.raw build/SENSOR.EXE 0
+++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor1.pe build/rt_sensor1.o
+++objcopy --only-section=.text -O binary build/rt_sensor1.pe build/rt_sensor1.raw
+++make_exe1 build/rt_sensor1.raw build/SENSOR1.EXE 0
+++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor2.pe build/rt_sensor2.o
+++objcopy --only-section=.text -O binary build/rt_sensor2.pe build/rt_sensor2.raw
+++make_exe1 build/rt_sensor2.raw build/SENSOR2.EXE 0
++ # Тестовый графический ресурс: чистый RAW 320x200x256, ровно 64000 байт.
++ # Важно: mkfat16 ниже получает все входные файлы из каталога build/.
++ # Поэтому ресурс сначала явно копируется из исходного каталога resources/
++@@ -252,13 +260,13 @@
++     mtid=`printf '%02d' "$i"`
++     EXECMT_FILES="$EXECMT_FILES build/MT${mtid}.EXE"
++ done
++-./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
+++./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
++ 
++ test -s build/disk.img || { echo "ERROR: mkfat16 finished without creating build/disk.img" >&2; exit 1; }
++ echo "[FAT16] disk.img created: `wc -c < build/disk.img | tr -d ' '` bytes"
++ 
++ # Verify every shipped EXE1 entry before writing the boot sector/kernel.
++-for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
+++for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
++     ./build/fat16check.exe build/disk.img "$qname"
++ done
++ if [ -f build/AUTOSTART.SH ]; then
++@@ -340,6 +348,7 @@
++ sh ./check_rtd_stage3_f10.sh
++ sh ./check_rtd_stage4_1.sh
++ sh ./check_rtd_stage4_2.sh
+++sh ./check_rtd_stage4_3.sh
++ ./check71.sh
++ ./check72.sh
++ ./check73.sh
++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md
++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md	2026-09-18 10:18:43.422830121 +0000
++@@ -0,0 +1,18 @@
+++# Состав архива Stage 4.3
+++
+++База: `ToyOS v67 RTD Stage 4.2`.
+++
+++Новые файлы:
+++
+++- `src/rt_sensor_diag.c`
+++- `check_rtd_stage4_3.sh`
+++- `tools/test_rtd_stage4_3.c`
+++- `changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md`
+++- `changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md`
+++- `changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md`
+++- `changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md`
+++- `changes/RTD/Stage4/Stage4_3/STAGE4_3.patch`
+++
+++Изменён: `build.sh`.
+++
+++`build/` в исходный архив не включается.
++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md
++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md	2026-09-18 10:18:43.420184124 +0000
++@@ -0,0 +1,26 @@
+++# ToyOS v67 RTD Stage 4.3 — SENSOR1/SENSOR2 для наблюдения параллельного RT
+++
+++## Цель
+++
+++Stage 4.3 добавляет два диагностических бинарника `SENSOR1.EXE` и `SENSOR2.EXE`.
+++Они нужны для наблюдения нескольких одновременно работающих RT-задач и для
+++проверки ранее реализованного priority arbitration.
+++
+++## Пошаговые изменения
+++
+++1. Добавлен единый исходник `src/rt_sensor_diag.c`.
+++2. Исходник компилируется два раза с `RT_SENSOR_DIAG_ID=1` и `=2`.
+++3. Получаются два независимых обычных EXE1: `SENSOR1.EXE` и `SENSOR2.EXE`.
+++4. `SENSOR1.EXE` выводит строки с префиксом `SENSOR1:`.
+++5. `SENSOR2.EXE` выводит строки с префиксом `SENSOR2:`.
+++6. Оба бинарника используют только существующие syscall `SYS_RT_INFO`,
+++   `SYS_CONSOLE_POLL`, `SYS_RT_WAIT` и `SYS_EXIT`.
+++7. Добавлены отдельные записи сборки и FAT16 для обоих файлов.
+++8. Добавлен `check_rtd_stage4_3.sh` и host-test
+++   `tools/test_rtd_stage4_3.c`.
+++
+++## Что не меняется
+++
+++`rt_priority_compare()` и `rt_pick_ready()` остаются реализацией Stage 4.2.
+++Stage 4.3 не меняет scheduler, F10, ESC, shell context, `SYS_RT_WAIT`,
+++period/deadline или EXE1 ABI.
++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch
++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch	2026-09-18 10:18:06.198641818 +0000
++@@ -0,0 +1,627 @@
+++diff -ruN /tmp/st43base/toyos_stage42/build.sh /tmp/st42/toyos_stage42/build.sh
+++--- /tmp/st43base/toyos_stage42/build.sh	2026-09-18 10:05:48.000000000 +0000
++++++ /tmp/st42/toyos_stage42/build.sh	2026-09-18 10:17:54.509353725 +0000
+++@@ -62,6 +62,8 @@
+++ # application binaries.
+++ gcc $CFLAGS -c src/rtd.c -o build/rtd.o
+++ gcc $CFLAGS -c src/rt_sensor.c -o build/rt_sensor.o
++++gcc $CFLAGS -c src/rt_sensor1.c -o build/rt_sensor1.o
++++gcc $CFLAGS -c src/rt_sensor2.c -o build/rt_sensor2.o
+++ 
+++ # Additional EXE1 queue-validation programs. Each is linked independently at
+++ # the same user image address because the kernel executes queue members
+++@@ -198,6 +200,12 @@
+++ ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor.pe build/rt_sensor.o
+++ objcopy --only-section=.text -O binary build/rt_sensor.pe build/rt_sensor.raw
+++ make_exe1 build/rt_sensor.raw build/SENSOR.EXE 0
++++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor1.pe build/rt_sensor1.o
++++objcopy --only-section=.text -O binary build/rt_sensor1.pe build/rt_sensor1.raw
++++make_exe1 build/rt_sensor1.raw build/SENSOR1.EXE 0
++++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor2.pe build/rt_sensor2.o
++++objcopy --only-section=.text -O binary build/rt_sensor2.pe build/rt_sensor2.raw
++++make_exe1 build/rt_sensor2.raw build/SENSOR2.EXE 0
+++ # Тестовый графический ресурс: чистый RAW 320x200x256, ровно 64000 байт.
+++ # Важно: mkfat16 ниже получает все входные файлы из каталога build/.
+++ # Поэтому ресурс сначала явно копируется из исходного каталога resources/
+++@@ -252,13 +260,13 @@
+++     mtid=`printf '%02d' "$i"`
+++     EXECMT_FILES="$EXECMT_FILES build/MT${mtid}.EXE"
+++ done
+++-./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
++++./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
+++ 
+++ test -s build/disk.img || { echo "ERROR: mkfat16 finished without creating build/disk.img" >&2; exit 1; }
+++ echo "[FAT16] disk.img created: `wc -c < build/disk.img | tr -d ' '` bytes"
+++ 
+++ # Verify every shipped EXE1 entry before writing the boot sector/kernel.
+++-for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
++++for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
+++     ./build/fat16check.exe build/disk.img "$qname"
+++ done
+++ if [ -f build/AUTOSTART.SH ]; then
+++@@ -340,6 +348,7 @@
+++ sh ./check_rtd_stage3_f10.sh
+++ sh ./check_rtd_stage4_1.sh
+++ sh ./check_rtd_stage4_2.sh
++++sh ./check_rtd_stage4_3.sh
+++ ./check71.sh
+++ ./check72.sh
+++ ./check73.sh
+++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md
+++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md	2026-09-18 10:17:54.671635081 +0000
+++@@ -0,0 +1,17 @@
++++# Состав архива Stage 4.3
++++
++++Базовая версия: `ToyOS v67 RTD Stage 4.2`.
++++
++++Новые RTD-файлы:
++++
++++- `src/rt_sensor1.c`
++++- `src/rt_sensor2.c`
++++- `check_rtd_stage4_3.sh`
++++- `tools/test_rtd_stage4_3.c`
++++- `changes/RTD/Stage4/Stage4_3/*`
++++
++++Изменённый build-файл:
++++
++++- `build.sh`
++++
++++Бинарные артефакты `build/` в исходный архив не включаются.
+++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md
+++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md	2026-09-18 10:17:54.669167243 +0000
+++@@ -0,0 +1,26 @@
++++# ToyOS v67 RTD Stage 4.3 — диагностические SENSOR1/SENSOR2
++++
++++## Назначение
++++
++++Stage 4.3 не меняет алгоритм планировщика. Его задача — дать два обычных EXE1,
++++которые позволяют визуально отличать одновременно работающие RT-задачи.
++++
++++## Изменения
++++
++++1. Добавлен `src/rt_sensor1.c` → `SENSOR1.EXE`.
++++2. Добавлен `src/rt_sensor2.c` → `SENSOR2.EXE`.
++++3. Оба приложения используют существующие `SYS_RT_INFO`, `SYS_RT_WAIT`,
++++   `SYS_CONSOLE_POLL` и `SYS_EXIT`.
++++4. Оба файла собираются существующим `program.ld` в формат EXE1.
++++5. `build.sh` устанавливает оба файла в FAT16 root и проверяет их наличие.
++++6. Добавлен `check_rtd_stage4_3.sh` и host unit-test `tools/test_rtd_stage4_3.c`.
++++
++++## Наблюдаемое различие
++++
++++`SENSOR1.EXE` печатает `SENSOR1: tick`, а `SENSOR2.EXE` печатает
++++`SENSOR2: tick`. Старт и остановка также имеют разные префиксы.
++++
++++## Что намеренно не изменено
++++
++++`rt_pick_ready()`, `rt_priority_compare()`, `SYS_RT_WAIT`, ESC, F10,
++++завершение RT и shell context не изменялись.
+++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch
+++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/STAGE4_3.patch	2026-09-18 10:18:00.058303093 +0000
+++@@ -0,0 +1,303 @@
++++diff -ruN /tmp/st43base/toyos_stage42/build.sh /tmp/st42/toyos_stage42/build.sh
++++--- /tmp/st43base/toyos_stage42/build.sh	2026-09-18 10:05:48.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/build.sh	2026-09-18 10:17:54.509353725 +0000
++++@@ -62,6 +62,8 @@
++++ # application binaries.
++++ gcc $CFLAGS -c src/rtd.c -o build/rtd.o
++++ gcc $CFLAGS -c src/rt_sensor.c -o build/rt_sensor.o
+++++gcc $CFLAGS -c src/rt_sensor1.c -o build/rt_sensor1.o
+++++gcc $CFLAGS -c src/rt_sensor2.c -o build/rt_sensor2.o
++++ 
++++ # Additional EXE1 queue-validation programs. Each is linked independently at
++++ # the same user image address because the kernel executes queue members
++++@@ -198,6 +200,12 @@
++++ ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor.pe build/rt_sensor.o
++++ objcopy --only-section=.text -O binary build/rt_sensor.pe build/rt_sensor.raw
++++ make_exe1 build/rt_sensor.raw build/SENSOR.EXE 0
+++++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor1.pe build/rt_sensor1.o
+++++objcopy --only-section=.text -O binary build/rt_sensor1.pe build/rt_sensor1.raw
+++++make_exe1 build/rt_sensor1.raw build/SENSOR1.EXE 0
+++++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor2.pe build/rt_sensor2.o
+++++objcopy --only-section=.text -O binary build/rt_sensor2.pe build/rt_sensor2.raw
+++++make_exe1 build/rt_sensor2.raw build/SENSOR2.EXE 0
++++ # Тестовый графический ресурс: чистый RAW 320x200x256, ровно 64000 байт.
++++ # Важно: mkfat16 ниже получает все входные файлы из каталога build/.
++++ # Поэтому ресурс сначала явно копируется из исходного каталога resources/
++++@@ -252,13 +260,13 @@
++++     mtid=`printf '%02d' "$i"`
++++     EXECMT_FILES="$EXECMT_FILES build/MT${mtid}.EXE"
++++ done
++++-./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
+++++./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
++++ 
++++ test -s build/disk.img || { echo "ERROR: mkfat16 finished without creating build/disk.img" >&2; exit 1; }
++++ echo "[FAT16] disk.img created: `wc -c < build/disk.img | tr -d ' '` bytes"
++++ 
++++ # Verify every shipped EXE1 entry before writing the boot sector/kernel.
++++-for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
+++++for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
++++     ./build/fat16check.exe build/disk.img "$qname"
++++ done
++++ if [ -f build/AUTOSTART.SH ]; then
++++@@ -340,6 +348,7 @@
++++ sh ./check_rtd_stage3_f10.sh
++++ sh ./check_rtd_stage4_1.sh
++++ sh ./check_rtd_stage4_2.sh
+++++sh ./check_rtd_stage4_3.sh
++++ ./check71.sh
++++ ./check72.sh
++++ ./check73.sh
++++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md
++++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/ARCHIVE_MANIFEST_RU.md	2026-09-18 10:17:54.671635081 +0000
++++@@ -0,0 +1,17 @@
+++++# Состав архива Stage 4.3
+++++
+++++Базовая версия: `ToyOS v67 RTD Stage 4.2`.
+++++
+++++Новые RTD-файлы:
+++++
+++++- `src/rt_sensor1.c`
+++++- `src/rt_sensor2.c`
+++++- `check_rtd_stage4_3.sh`
+++++- `tools/test_rtd_stage4_3.c`
+++++- `changes/RTD/Stage4/Stage4_3/*`
+++++
+++++Изменённый build-файл:
+++++
+++++- `build.sh`
+++++
+++++Бинарные артефакты `build/` в исходный архив не включаются.
++++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md
++++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/RELEASE_NOTES_RU.md	2026-09-18 10:17:54.669167243 +0000
++++@@ -0,0 +1,26 @@
+++++# ToyOS v67 RTD Stage 4.3 — диагностические SENSOR1/SENSOR2
+++++
+++++## Назначение
+++++
+++++Stage 4.3 не меняет алгоритм планировщика. Его задача — дать два обычных EXE1,
+++++которые позволяют визуально отличать одновременно работающие RT-задачи.
+++++
+++++## Изменения
+++++
+++++1. Добавлен `src/rt_sensor1.c` → `SENSOR1.EXE`.
+++++2. Добавлен `src/rt_sensor2.c` → `SENSOR2.EXE`.
+++++3. Оба приложения используют существующие `SYS_RT_INFO`, `SYS_RT_WAIT`,
+++++   `SYS_CONSOLE_POLL` и `SYS_EXIT`.
+++++4. Оба файла собираются существующим `program.ld` в формат EXE1.
+++++5. `build.sh` устанавливает оба файла в FAT16 root и проверяет их наличие.
+++++6. Добавлен `check_rtd_stage4_3.sh` и host unit-test `tools/test_rtd_stage4_3.c`.
+++++
+++++## Наблюдаемое различие
+++++
+++++`SENSOR1.EXE` печатает `SENSOR1: tick`, а `SENSOR2.EXE` печатает
+++++`SENSOR2: tick`. Старт и остановка также имеют разные префиксы.
+++++
+++++## Что намеренно не изменено
+++++
+++++`rt_pick_ready()`, `rt_priority_compare()`, `SYS_RT_WAIT`, ESC, F10,
+++++завершение RT и shell context не изменялись.
++++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md
++++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md	2026-09-18 10:17:54.669356822 +0000
++++@@ -0,0 +1,42 @@
+++++# Тест-план Stage 4.3
+++++
+++++## 1. Статическая проверка
+++++
+++++Запустить:
+++++
+++++    sh check_rtd_stage4_3.sh
+++++
+++++Ожидается: `RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed`.
+++++
+++++## 2. Сборка
+++++
+++++Запустить штатный `./build.sh`. В FAT16 root должны присутствовать
+++++`SENSOR1.EXE` и `SENSOR2.EXE`.
+++++
+++++## 3. Подготовка двух задач
+++++
+++++    exec RTD.EXE SENSOR1.EXE 20 20 3
+++++    exec RTD.EXE SENSOR2.EXE 20 20 7
+++++    F10
+++++
+++++До F10 обе команды только подготавливаются.
+++++
+++++## 4. Наблюдение
+++++
+++++В консоли должны различаться строки:
+++++
+++++    SENSOR1: tick
+++++    SENSOR2: tick
+++++
+++++Это позволяет определить фактическую активность каждой RT-задачи.
+++++
+++++## 5. Остановка
+++++
+++++ESC должен завершать текущую RT-задачу с её собственным сообщением
+++++`SENSOR1: ESC -> stopped` или `SENSOR2: ESC -> stopped`.
+++++
+++++## 6. Приоритет
+++++
+++++Для первичной проверки Stage 4.2 использовать одинаковый period/deadline и
+++++разные priority. Stage 4.3 добавляет только наблюдаемость и не изменяет
+++++правило выбора.
++++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md
++++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md	2026-09-18 10:17:54.670861085 +0000
++++@@ -0,0 +1,17 @@
+++++# Проверка Stage 4.3
+++++
+++++## Автоматические проверки
+++++
+++++- наличие `src/rt_sensor1.c`: PASS
+++++- наличие `src/rt_sensor2.c`: PASS
+++++- уникальный вывод SENSOR1: PASS
+++++- уникальный вывод SENSOR2: PASS
+++++- ESC-ветка SENSOR1: PASS
+++++- ESC-ветка SENSOR2: PASS
+++++- сборка SENSOR1 в `build.sh`: PASS
+++++- сборка SENSOR2 в `build.sh`: PASS
+++++- установка SENSOR1.EXE в FAT16: PASS
+++++- установка SENSOR2.EXE в FAT16: PASS
+++++- Stage 4.3 host test: PASS
+++++
+++++Реальный boot/runtime зависит от среды, в которой выполняется ToyOS.
++++diff -ruN /tmp/st43base/toyos_stage42/check_rtd_stage4_3.sh /tmp/st42/toyos_stage42/check_rtd_stage4_3.sh
++++--- /tmp/st43base/toyos_stage42/check_rtd_stage4_3.sh	1970-01-01 00:00:00.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/check_rtd_stage4_3.sh	2026-09-18 10:17:54.667482774 +0000
++++@@ -0,0 +1,33 @@
+++++#!/bin/sh
+++++set -eu
+++++
+++++test -f src/rt_sensor1.c
+++++test -f src/rt_sensor2.c
+++++
+++++grep -q 'SENSOR1: started ordinary EXE1' src/rt_sensor1.c
+++++grep -q 'SENSOR1: tick' src/rt_sensor1.c
+++++grep -q 'SENSOR1: ESC -> stopped' src/rt_sensor1.c
+++++grep -q 'SENSOR2: started ordinary EXE1' src/rt_sensor2.c
+++++grep -q 'SENSOR2: tick' src/rt_sensor2.c
+++++grep -q 'SENSOR2: ESC -> stopped' src/rt_sensor2.c
+++++
+++++grep -q 'rt_sensor1.c' build.sh
+++++grep -q 'rt_sensor2.c' build.sh
+++++grep -q 'SENSOR1.EXE' build.sh
+++++grep -q 'SENSOR2.EXE' build.sh
+++++
+++++grep -q 'SENSOR.EXE' src/rtd.c
+++++
+++++grep -q 'rt_pick_ready' src/kernel.c
+++++
+++++grep -q 'rt_priority_compare' src/kernel.c
+++++
+++++cc=${CC:-gcc}
+++++tmpdir=${TMPDIR:-/tmp}
+++++tmp="$tmpdir/toyos_rt_stage43_$$"
+++++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+++++mkdir -p "$tmp"
+++++$cc -std=c99 -Wall -Wextra -Werror tools/test_rtd_stage4_3.c -o "$tmp/test_rtd_stage4_3"
+++++"$tmp/test_rtd_stage4_3"
+++++
+++++echo 'RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed'
++++diff -ruN /tmp/st43base/toyos_stage42/src/rt_sensor1.c /tmp/st42/toyos_stage42/src/rt_sensor1.c
++++--- /tmp/st43base/toyos_stage42/src/rt_sensor1.c	1970-01-01 00:00:00.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/src/rt_sensor1.c	2026-09-18 10:17:54.063245644 +0000
++++@@ -0,0 +1,34 @@
+++++/* SENSOR1.EXE - ordinary EXE1 diagnostic application for RT priority tests.
+++++ * This binary is intentionally a normal ToyOS EXE1 program.  The RT layer
+++++ * only supplies timing information; the application remains unaware of any
+++++ * private image/loader format.
+++++ */
+++++typedef unsigned int uint32_t;
+++++typedef unsigned char uint8_t;
+++++#define SYS_CONSOLE_WRITE 1u
+++++#define SYS_CONSOLE_POLL 37u
+++++#define SYS_RT_INFO      39u
+++++#define SYS_RT_WAIT      40u
+++++#define SYS_EXIT         12u
+++++static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
+++++static void put(const char*s){uint32_t n=0;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+++++static void put_u32(uint32_t v){char b[12];uint32_t i=0,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+(v%10u));v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
+++++__attribute__((section(".usertext"))) void program_main(void){
+++++    uint32_t info[8],period=20u,deadline=20u,priority=0u,wr;
+++++    uint8_t key=0u;
+++++    if(sc(SYS_RT_INFO,(uint32_t)info,0,0)==0u){period=info[0];deadline=info[1];priority=info[2];}
+++++    put("SENSOR1: started ordinary EXE1 period=");put_u32(period);put("ms deadline=");put_u32(deadline);put("ms priority=");put_u32(priority);put(" (ESC to stop)\n");
+++++    for(;;){
+++++        if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("SENSOR1: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
+++++        put("SENSOR1: tick\n");
+++++        wr=sc(SYS_RT_WAIT,0,0,0);
+++++        if(wr==1u)put("SENSOR1: deadline miss\n");
+++++        if(wr==0xffffffffu){put("SENSOR1: RT wait FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}
+++++    }
+++++}
+++++__asm__(
+++++".section .start,\"ax\"\n"
+++++".global _start\n"
+++++"_start:\n"
+++++"jmp _program_main\n"
+++++);
++++diff -ruN /tmp/st43base/toyos_stage42/src/rt_sensor2.c /tmp/st42/toyos_stage42/src/rt_sensor2.c
++++--- /tmp/st43base/toyos_stage42/src/rt_sensor2.c	1970-01-01 00:00:00.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/src/rt_sensor2.c	2026-09-18 10:17:54.064121664 +0000
++++@@ -0,0 +1,34 @@
+++++/* SENSOR2.EXE - ordinary EXE1 diagnostic application for RT priority tests.
+++++ * This binary intentionally mirrors SENSOR1 while using a distinct console
+++++ * prefix, making simultaneous RT execution observable without changing the
+++++ * scheduler or the EXE1 ABI.
+++++ */
+++++typedef unsigned int uint32_t;
+++++typedef unsigned char uint8_t;
+++++#define SYS_CONSOLE_WRITE 1u
+++++#define SYS_CONSOLE_POLL 37u
+++++#define SYS_RT_INFO      39u
+++++#define SYS_RT_WAIT      40u
+++++#define SYS_EXIT         12u
+++++static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
+++++static void put(const char*s){uint32_t n=0;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+++++static void put_u32(uint32_t v){char b[12];uint32_t i=0,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+(v%10u));v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
+++++__attribute__((section(".usertext"))) void program_main(void){
+++++    uint32_t info[8],period=20u,deadline=20u,priority=0u,wr;
+++++    uint8_t key=0u;
+++++    if(sc(SYS_RT_INFO,(uint32_t)info,0,0)==0u){period=info[0];deadline=info[1];priority=info[2];}
+++++    put("SENSOR2: started ordinary EXE1 period=");put_u32(period);put("ms deadline=");put_u32(deadline);put("ms priority=");put_u32(priority);put(" (ESC to stop)\n");
+++++    for(;;){
+++++        if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("SENSOR2: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
+++++        put("SENSOR2: tick\n");
+++++        wr=sc(SYS_RT_WAIT,0,0,0);
+++++        if(wr==1u)put("SENSOR2: deadline miss\n");
+++++        if(wr==0xffffffffu){put("SENSOR2: RT wait FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}
+++++    }
+++++}
+++++__asm__(
+++++".section .start,\"ax\"\n"
+++++".global _start\n"
+++++"_start:\n"
+++++"jmp _program_main\n"
+++++);
++++diff -ruN /tmp/st43base/toyos_stage42/tools/test_rtd_stage4_3.c /tmp/st42/toyos_stage42/tools/test_rtd_stage4_3.c
++++--- /tmp/st43base/toyos_stage42/tools/test_rtd_stage4_3.c	1970-01-01 00:00:00.000000000 +0000
+++++++ /tmp/st42/toyos_stage42/tools/test_rtd_stage4_3.c	2026-09-18 10:17:54.668374418 +0000
++++@@ -0,0 +1,19 @@
+++++#include <stdio.h>
+++++#include <string.h>
+++++#include <stdlib.h>
+++++static int contains(const char *file,const char *needle){
+++++    FILE *f=fopen(file,"rb"); long n; char *p; size_t got;
+++++    if(!f)return 0; if(fseek(f,0,SEEK_END)!=0){fclose(f);return 0;} n=ftell(f); if(n<0){fclose(f);return 0;} rewind(f);
+++++    p=(char*)malloc((size_t)n+1u); if(!p){fclose(f);return 0;} got=fread(p,1,(size_t)n,f); fclose(f); p[got]=0;
+++++    n=(long)(strstr(p,needle)!=NULL); free(p); return n!=0;
+++++}
+++++int main(void){
+++++    if(!contains("src/rt_sensor1.c","SENSOR1: tick"))return 1;
+++++    if(!contains("src/rt_sensor2.c","SENSOR2: tick"))return 2;
+++++    if(!contains("src/rt_sensor1.c","SENSOR1: ESC -> stopped"))return 3;
+++++    if(!contains("src/rt_sensor2.c","SENSOR2: ESC -> stopped"))return 4;
+++++    if(!contains("build.sh","build/SENSOR1.EXE=SENSOR1.EXE"))return 5;
+++++    if(!contains("build.sh","build/SENSOR2.EXE=SENSOR2.EXE"))return 6;
+++++    puts("Stage 4.3 diagnostic source/build assertions passed");
+++++    return 0;
+++++}
+++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md
+++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md	2026-09-18 10:17:54.669356822 +0000
+++@@ -0,0 +1,42 @@
++++# Тест-план Stage 4.3
++++
++++## 1. Статическая проверка
++++
++++Запустить:
++++
++++    sh check_rtd_stage4_3.sh
++++
++++Ожидается: `RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed`.
++++
++++## 2. Сборка
++++
++++Запустить штатный `./build.sh`. В FAT16 root должны присутствовать
++++`SENSOR1.EXE` и `SENSOR2.EXE`.
++++
++++## 3. Подготовка двух задач
++++
++++    exec RTD.EXE SENSOR1.EXE 20 20 3
++++    exec RTD.EXE SENSOR2.EXE 20 20 7
++++    F10
++++
++++До F10 обе команды только подготавливаются.
++++
++++## 4. Наблюдение
++++
++++В консоли должны различаться строки:
++++
++++    SENSOR1: tick
++++    SENSOR2: tick
++++
++++Это позволяет определить фактическую активность каждой RT-задачи.
++++
++++## 5. Остановка
++++
++++ESC должен завершать текущую RT-задачу с её собственным сообщением
++++`SENSOR1: ESC -> stopped` или `SENSOR2: ESC -> stopped`.
++++
++++## 6. Приоритет
++++
++++Для первичной проверки Stage 4.2 использовать одинаковый period/deadline и
++++разные priority. Stage 4.3 добавляет только наблюдаемость и не изменяет
++++правило выбора.
+++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md
+++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md	2026-09-18 10:17:54.670861085 +0000
+++@@ -0,0 +1,17 @@
++++# Проверка Stage 4.3
++++
++++## Автоматические проверки
++++
++++- наличие `src/rt_sensor1.c`: PASS
++++- наличие `src/rt_sensor2.c`: PASS
++++- уникальный вывод SENSOR1: PASS
++++- уникальный вывод SENSOR2: PASS
++++- ESC-ветка SENSOR1: PASS
++++- ESC-ветка SENSOR2: PASS
++++- сборка SENSOR1 в `build.sh`: PASS
++++- сборка SENSOR2 в `build.sh`: PASS
++++- установка SENSOR1.EXE в FAT16: PASS
++++- установка SENSOR2.EXE в FAT16: PASS
++++- Stage 4.3 host test: PASS
++++
++++Реальный boot/runtime зависит от среды, в которой выполняется ToyOS.
+++diff -ruN /tmp/st43base/toyos_stage42/check_rtd_stage4_3.sh /tmp/st42/toyos_stage42/check_rtd_stage4_3.sh
+++--- /tmp/st43base/toyos_stage42/check_rtd_stage4_3.sh	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/check_rtd_stage4_3.sh	2026-09-18 10:17:54.667482774 +0000
+++@@ -0,0 +1,33 @@
++++#!/bin/sh
++++set -eu
++++
++++test -f src/rt_sensor1.c
++++test -f src/rt_sensor2.c
++++
++++grep -q 'SENSOR1: started ordinary EXE1' src/rt_sensor1.c
++++grep -q 'SENSOR1: tick' src/rt_sensor1.c
++++grep -q 'SENSOR1: ESC -> stopped' src/rt_sensor1.c
++++grep -q 'SENSOR2: started ordinary EXE1' src/rt_sensor2.c
++++grep -q 'SENSOR2: tick' src/rt_sensor2.c
++++grep -q 'SENSOR2: ESC -> stopped' src/rt_sensor2.c
++++
++++grep -q 'rt_sensor1.c' build.sh
++++grep -q 'rt_sensor2.c' build.sh
++++grep -q 'SENSOR1.EXE' build.sh
++++grep -q 'SENSOR2.EXE' build.sh
++++
++++grep -q 'SENSOR.EXE' src/rtd.c
++++
++++grep -q 'rt_pick_ready' src/kernel.c
++++
++++grep -q 'rt_priority_compare' src/kernel.c
++++
++++cc=${CC:-gcc}
++++tmpdir=${TMPDIR:-/tmp}
++++tmp="$tmpdir/toyos_rt_stage43_$$"
++++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
++++mkdir -p "$tmp"
++++$cc -std=c99 -Wall -Wextra -Werror tools/test_rtd_stage4_3.c -o "$tmp/test_rtd_stage4_3"
++++"$tmp/test_rtd_stage4_3"
++++
++++echo 'RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed'
+++diff -ruN /tmp/st43base/toyos_stage42/src/rt_sensor1.c /tmp/st42/toyos_stage42/src/rt_sensor1.c
+++--- /tmp/st43base/toyos_stage42/src/rt_sensor1.c	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/src/rt_sensor1.c	2026-09-18 10:17:54.063245644 +0000
+++@@ -0,0 +1,34 @@
++++/* SENSOR1.EXE - ordinary EXE1 diagnostic application for RT priority tests.
++++ * This binary is intentionally a normal ToyOS EXE1 program.  The RT layer
++++ * only supplies timing information; the application remains unaware of any
++++ * private image/loader format.
++++ */
++++typedef unsigned int uint32_t;
++++typedef unsigned char uint8_t;
++++#define SYS_CONSOLE_WRITE 1u
++++#define SYS_CONSOLE_POLL 37u
++++#define SYS_RT_INFO      39u
++++#define SYS_RT_WAIT      40u
++++#define SYS_EXIT         12u
++++static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
++++static void put(const char*s){uint32_t n=0;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
++++static void put_u32(uint32_t v){char b[12];uint32_t i=0,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+(v%10u));v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
++++__attribute__((section(".usertext"))) void program_main(void){
++++    uint32_t info[8],period=20u,deadline=20u,priority=0u,wr;
++++    uint8_t key=0u;
++++    if(sc(SYS_RT_INFO,(uint32_t)info,0,0)==0u){period=info[0];deadline=info[1];priority=info[2];}
++++    put("SENSOR1: started ordinary EXE1 period=");put_u32(period);put("ms deadline=");put_u32(deadline);put("ms priority=");put_u32(priority);put(" (ESC to stop)\n");
++++    for(;;){
++++        if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("SENSOR1: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
++++        put("SENSOR1: tick\n");
++++        wr=sc(SYS_RT_WAIT,0,0,0);
++++        if(wr==1u)put("SENSOR1: deadline miss\n");
++++        if(wr==0xffffffffu){put("SENSOR1: RT wait FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}
++++    }
++++}
++++__asm__(
++++".section .start,\"ax\"\n"
++++".global _start\n"
++++"_start:\n"
++++"jmp _program_main\n"
++++);
+++diff -ruN /tmp/st43base/toyos_stage42/src/rt_sensor2.c /tmp/st42/toyos_stage42/src/rt_sensor2.c
+++--- /tmp/st43base/toyos_stage42/src/rt_sensor2.c	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/src/rt_sensor2.c	2026-09-18 10:17:54.064121664 +0000
+++@@ -0,0 +1,34 @@
++++/* SENSOR2.EXE - ordinary EXE1 diagnostic application for RT priority tests.
++++ * This binary intentionally mirrors SENSOR1 while using a distinct console
++++ * prefix, making simultaneous RT execution observable without changing the
++++ * scheduler or the EXE1 ABI.
++++ */
++++typedef unsigned int uint32_t;
++++typedef unsigned char uint8_t;
++++#define SYS_CONSOLE_WRITE 1u
++++#define SYS_CONSOLE_POLL 37u
++++#define SYS_RT_INFO      39u
++++#define SYS_RT_WAIT      40u
++++#define SYS_EXIT         12u
++++static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
++++static void put(const char*s){uint32_t n=0;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
++++static void put_u32(uint32_t v){char b[12];uint32_t i=0,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+(v%10u));v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
++++__attribute__((section(".usertext"))) void program_main(void){
++++    uint32_t info[8],period=20u,deadline=20u,priority=0u,wr;
++++    uint8_t key=0u;
++++    if(sc(SYS_RT_INFO,(uint32_t)info,0,0)==0u){period=info[0];deadline=info[1];priority=info[2];}
++++    put("SENSOR2: started ordinary EXE1 period=");put_u32(period);put("ms deadline=");put_u32(deadline);put("ms priority=");put_u32(priority);put(" (ESC to stop)\n");
++++    for(;;){
++++        if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("SENSOR2: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
++++        put("SENSOR2: tick\n");
++++        wr=sc(SYS_RT_WAIT,0,0,0);
++++        if(wr==1u)put("SENSOR2: deadline miss\n");
++++        if(wr==0xffffffffu){put("SENSOR2: RT wait FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}
++++    }
++++}
++++__asm__(
++++".section .start,\"ax\"\n"
++++".global _start\n"
++++"_start:\n"
++++"jmp _program_main\n"
++++);
+++diff -ruN /tmp/st43base/toyos_stage42/tools/test_rtd_stage4_3.c /tmp/st42/toyos_stage42/tools/test_rtd_stage4_3.c
+++--- /tmp/st43base/toyos_stage42/tools/test_rtd_stage4_3.c	1970-01-01 00:00:00.000000000 +0000
++++++ /tmp/st42/toyos_stage42/tools/test_rtd_stage4_3.c	2026-09-18 10:18:05.878354207 +0000
+++@@ -0,0 +1,36 @@
++++#include <stdio.h>
++++#include <string.h>
++++#include <stdlib.h>
++++
++++static int contains(const char *file,const char *needle){
++++    FILE *f;
++++    long n;
++++    char *p;
++++    size_t got;
++++    int found;
++++    f=fopen(file,"rb");
++++    if(!f)return 0;
++++    if(fseek(f,0,SEEK_END)!=0){fclose(f);return 0;}
++++    n=ftell(f);
++++    if(n<0){fclose(f);return 0;}
++++    rewind(f);
++++    p=(char*)malloc((size_t)n+1u);
++++    if(!p){fclose(f);return 0;}
++++    got=fread(p,1,(size_t)n,f);
++++    fclose(f);
++++    p[got]=0;
++++    found=(strstr(p,needle)!=NULL);
++++    free(p);
++++    return found;
++++}
++++
++++int main(void){
++++    if(!contains("src/rt_sensor1.c","SENSOR1: tick"))return 1;
++++    if(!contains("src/rt_sensor2.c","SENSOR2: tick"))return 2;
++++    if(!contains("src/rt_sensor1.c","SENSOR1: ESC -> stopped"))return 3;
++++    if(!contains("src/rt_sensor2.c","SENSOR2: ESC -> stopped"))return 4;
++++    if(!contains("build.sh","build/SENSOR1.EXE=SENSOR1.EXE"))return 5;
++++    if(!contains("build.sh","build/SENSOR2.EXE=SENSOR2.EXE"))return 6;
++++    puts("Stage 4.3 diagnostic source/build assertions passed");
++++    return 0;
++++}
++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md
++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md	2026-09-18 10:18:43.421003840 +0000
++@@ -0,0 +1,42 @@
+++# Тест-план Stage 4.3
+++
+++## Шаг 1. Focused test
+++
+++    sh check_rtd_stage4_3.sh
+++
+++Ожидается:
+++
+++    RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed
+++
+++## Шаг 2. Сборка
+++
+++Запустить штатный:
+++
+++    ./build.sh
+++
+++В FAT16 root должны появиться `SENSOR1.EXE` и `SENSOR2.EXE`.
+++
+++## Шаг 3. Подготовить две задачи
+++
+++    exec RTD.EXE SENSOR1.EXE 20 20 3
+++    exec RTD.EXE SENSOR2.EXE 20 20 7
+++
+++Обе команды только подготавливают задачи. После второй команды нажать:
+++
+++    F10
+++
+++## Шаг 4. Наблюдение
+++
+++Ожидаются различимые строки:
+++
+++    SENSOR1: tick
+++    SENSOR2: tick
+++
+++При одинаковом period/deadline и `priority=7` против `priority=3` первый выбор
+++READY-задачи должен учитывать большее значение priority.
+++
+++## Шаг 5. Остановка
+++
+++ESC должен завершать выбранную RT-задачу. Соответствующая строка должна иметь
+++тот же префикс (`SENSOR1:` или `SENSOR2:`). Оставшаяся RT-задача должна продолжать
+++работать до своего ESC.
++diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md
++--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md	2026-09-18 10:18:43.421793680 +0000
++@@ -0,0 +1,17 @@
+++# Проверка Stage 4.3
+++
+++## Автоматические проверки
+++
+++- `src/rt_sensor_diag.c` существует: PASS
+++- два compile-time варианта диагностического приложения: PASS
+++- различимый вывод SENSOR1: PASS
+++- различимый вывод SENSOR2: PASS
+++- ESC для SENSOR1/SENSOR2: PASS
+++- сборка SENSOR1.EXE: PASS
+++- сборка SENSOR2.EXE: PASS
+++- FAT16-установка SENSOR1.EXE: PASS
+++- FAT16-установка SENSOR2.EXE: PASS
+++- `rt_pick_ready()`/priority arbitration остаются в коде Stage 4.2: PASS
+++- Stage 4.3 host test: PASS
+++
+++Runtime-проверка зависит от фактического запуска ToyOS в целевой среде.
++diff -ruN /tmp/st43base/toyos_stage42/check_rtd_stage4_3.sh /tmp/st42/toyos_stage42/check_rtd_stage4_3.sh
++--- /tmp/st43base/toyos_stage42/check_rtd_stage4_3.sh	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/st42/toyos_stage42/check_rtd_stage4_3.sh	2026-09-18 10:18:43.414295497 +0000
++@@ -0,0 +1,32 @@
+++#!/bin/sh
+++set -eu
+++
+++test -f src/rt_sensor_diag.c
+++
+++grep -q 'RT_SENSOR_DIAG_ID=1' build.sh
+++grep -q 'RT_SENSOR_DIAG_ID=2' build.sh
+++grep -q 'build/SENSOR1.EXE=SENSOR1.EXE' build.sh
+++grep -q 'build/SENSOR2.EXE=SENSOR2.EXE' build.sh
+++
+++grep -q 'SENSOR1: started ordinary EXE1' src/rt_sensor_diag.c
+++grep -q 'SENSOR1: tick' src/rt_sensor_diag.c
+++grep -q 'SENSOR1: ESC -> stopped' src/rt_sensor_diag.c
+++grep -q 'SENSOR2: started ordinary EXE1' src/rt_sensor_diag.c
+++grep -q 'SENSOR2: tick' src/rt_sensor_diag.c
+++grep -q 'SENSOR2: ESC -> stopped' src/rt_sensor_diag.c
+++
+++grep -q 'rt_priority_compare' src/kernel.c
+++grep -q 'rt_pick_ready' src/kernel.c
+++
+++grep -q 'make_exe1 build/rt_sensor1.raw build/SENSOR1.EXE 0' build.sh
+++grep -q 'make_exe1 build/rt_sensor2.raw build/SENSOR2.EXE 0' build.sh
+++
+++cc=${CC:-gcc}
+++tmpdir=${TMPDIR:-/tmp}
+++tmp="$tmpdir/toyos_rt_stage43_$$"
+++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+++mkdir -p "$tmp"
+++$cc -std=c99 -Wall -Wextra -Werror tools/test_rtd_stage4_3.c -o "$tmp/test_rtd_stage4_3"
+++"$tmp/test_rtd_stage4_3"
+++
+++echo 'RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed'
++diff -ruN /tmp/st43base/toyos_stage42/src/rt_sensor_diag.c /tmp/st42/toyos_stage42/src/rt_sensor_diag.c
++--- /tmp/st43base/toyos_stage42/src/rt_sensor_diag.c	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/st42/toyos_stage42/src/rt_sensor_diag.c	2026-09-18 10:18:42.769576524 +0000
++@@ -0,0 +1,52 @@
+++/* RT priority diagnostic EXE1 source. Build twice with RT_SENSOR_DIAG_ID=1/2.
+++ * Both outputs are ordinary ToyOS EXE1 programs; only the diagnostic prefix
+++ * differs so simultaneous RT execution is visible on the console.
+++ */
+++#ifndef RT_SENSOR_DIAG_ID
+++#define RT_SENSOR_DIAG_ID 1
+++#endif
+++#if RT_SENSOR_DIAG_ID == 1
+++#define SENSOR_STARTED "SENSOR1: started ordinary EXE1 period="
+++#define SENSOR_TICK "SENSOR1: tick\n"
+++#define SENSOR_ESC "SENSOR1: ESC -> stopped\n"
+++#define SENSOR_MISS "SENSOR1: deadline miss\n"
+++#define SENSOR_FAIL "SENSOR1: RT wait FAIL\n"
+++#elif RT_SENSOR_DIAG_ID == 2
+++#define SENSOR_STARTED "SENSOR2: started ordinary EXE1 period="
+++#define SENSOR_TICK "SENSOR2: tick\n"
+++#define SENSOR_ESC "SENSOR2: ESC -> stopped\n"
+++#define SENSOR_MISS "SENSOR2: deadline miss\n"
+++#define SENSOR_FAIL "SENSOR2: RT wait FAIL\n"
+++#else
+++#error "RT_SENSOR_DIAG_ID must be 1 or 2"
+++#endif
+++
+++typedef unsigned int uint32_t;
+++typedef unsigned char uint8_t;
+++#define SYS_CONSOLE_WRITE 1u
+++#define SYS_CONSOLE_POLL 37u
+++#define SYS_RT_INFO      39u
+++#define SYS_RT_WAIT      40u
+++#define SYS_EXIT         12u
+++static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
+++static void put(const char*s){uint32_t n=0;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
+++static void put_u32(uint32_t v){char b[12];uint32_t i=0,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+(v%10u));v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
+++__attribute__((section(".usertext"))) void program_main(void){
+++    uint32_t info[8],period=20u,deadline=20u,priority=0u,wr;
+++    uint8_t key=0u;
+++    if(sc(SYS_RT_INFO,(uint32_t)info,0,0)==0u){period=info[0];deadline=info[1];priority=info[2];}
+++    put(SENSOR_STARTED);put_u32(period);put("ms deadline=");put_u32(deadline);put("ms priority=");put_u32(priority);put(" (ESC to stop)\n");
+++    for(;;){
+++        if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put(SENSOR_ESC);sc(SYS_EXIT,0,0,0);for(;;){}}
+++        put(SENSOR_TICK);
+++        wr=sc(SYS_RT_WAIT,0,0,0);
+++        if(wr==1u)put(SENSOR_MISS);
+++        if(wr==0xffffffffu){put(SENSOR_FAIL);sc(SYS_EXIT,1,0,0);for(;;){}}
+++    }
+++}
+++__asm__(
+++".section .start,\"ax\"\n"
+++".global _start\n"
+++"_start:\n"
+++"jmp _program_main\n"
+++);
++diff -ruN /tmp/st43base/toyos_stage42/tools/test_rtd_stage4_3.c /tmp/st42/toyos_stage42/tools/test_rtd_stage4_3.c
++--- /tmp/st43base/toyos_stage42/tools/test_rtd_stage4_3.c	1970-01-01 00:00:00.000000000 +0000
+++++ /tmp/st42/toyos_stage42/tools/test_rtd_stage4_3.c	2026-09-18 10:18:43.419378180 +0000
++@@ -0,0 +1,38 @@
+++#include <stdio.h>
+++#include <stdlib.h>
+++#include <string.h>
+++
+++static int contains(const char *file,const char *needle){
+++    FILE *f;
+++    long n;
+++    char *buf;
+++    size_t got;
+++    int found;
+++    f=fopen(file,"rb");
+++    if(!f)return 0;
+++    if(fseek(f,0,SEEK_END)!=0){fclose(f);return 0;}
+++    n=ftell(f);
+++    if(n<0){fclose(f);return 0;}
+++    rewind(f);
+++    buf=(char*)malloc((size_t)n+1u);
+++    if(!buf){fclose(f);return 0;}
+++    got=fread(buf,1,(size_t)n,f);
+++    fclose(f);
+++    buf[got]=0;
+++    found=strstr(buf,needle)!=NULL;
+++    free(buf);
+++    return found;
+++}
+++
+++int main(void){
+++    if(!contains("src/rt_sensor_diag.c","SENSOR1: tick"))return 1;
+++    if(!contains("src/rt_sensor_diag.c","SENSOR2: tick"))return 2;
+++    if(!contains("src/rt_sensor_diag.c","SENSOR1: ESC -> stopped"))return 3;
+++    if(!contains("src/rt_sensor_diag.c","SENSOR2: ESC -> stopped"))return 4;
+++    if(!contains("build.sh","RT_SENSOR_DIAG_ID=1"))return 5;
+++    if(!contains("build.sh","RT_SENSOR_DIAG_ID=2"))return 6;
+++    if(!contains("build.sh","build/SENSOR1.EXE=SENSOR1.EXE"))return 7;
+++    if(!contains("build.sh","build/SENSOR2.EXE=SENSOR2.EXE"))return 8;
+++    puts("Stage 4.3 diagnostic source/build assertions passed");
+++    return 0;
+++}
+diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md
+--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/TEST_PLAN_RU.md	2026-09-18 10:18:43.421003840 +0000
+@@ -0,0 +1,42 @@
++# Тест-план Stage 4.3
++
++## Шаг 1. Focused test
++
++    sh check_rtd_stage4_3.sh
++
++Ожидается:
++
++    RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed
++
++## Шаг 2. Сборка
++
++Запустить штатный:
++
++    ./build.sh
++
++В FAT16 root должны появиться `SENSOR1.EXE` и `SENSOR2.EXE`.
++
++## Шаг 3. Подготовить две задачи
++
++    exec RTD.EXE SENSOR1.EXE 20 20 3
++    exec RTD.EXE SENSOR2.EXE 20 20 7
++
++Обе команды только подготавливают задачи. После второй команды нажать:
++
++    F10
++
++## Шаг 4. Наблюдение
++
++Ожидаются различимые строки:
++
++    SENSOR1: tick
++    SENSOR2: tick
++
++При одинаковом period/deadline и `priority=7` против `priority=3` первый выбор
++READY-задачи должен учитывать большее значение priority.
++
++## Шаг 5. Остановка
++
++ESC должен завершать выбранную RT-задачу. Соответствующая строка должна иметь
++тот же префикс (`SENSOR1:` или `SENSOR2:`). Оставшаяся RT-задача должна продолжать
++работать до своего ESC.
+diff -ruN /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md
+--- /tmp/st43base/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/changes/RTD/Stage4/Stage4_3/VERIFICATION_RU.md	2026-09-18 10:18:43.421793680 +0000
+@@ -0,0 +1,17 @@
++# Проверка Stage 4.3
++
++## Автоматические проверки
++
++- `src/rt_sensor_diag.c` существует: PASS
++- два compile-time варианта диагностического приложения: PASS
++- различимый вывод SENSOR1: PASS
++- различимый вывод SENSOR2: PASS
++- ESC для SENSOR1/SENSOR2: PASS
++- сборка SENSOR1.EXE: PASS
++- сборка SENSOR2.EXE: PASS
++- FAT16-установка SENSOR1.EXE: PASS
++- FAT16-установка SENSOR2.EXE: PASS
++- `rt_pick_ready()`/priority arbitration остаются в коде Stage 4.2: PASS
++- Stage 4.3 host test: PASS
++
++Runtime-проверка зависит от фактического запуска ToyOS в целевой среде.
+diff -ruN /tmp/st43base/toyos_stage42/check_rtd_stage4_3.sh /tmp/st42/toyos_stage42/check_rtd_stage4_3.sh
+--- /tmp/st43base/toyos_stage42/check_rtd_stage4_3.sh	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/check_rtd_stage4_3.sh	2026-09-18 10:18:43.414295497 +0000
+@@ -0,0 +1,32 @@
++#!/bin/sh
++set -eu
++
++test -f src/rt_sensor_diag.c
++
++grep -q 'RT_SENSOR_DIAG_ID=1' build.sh
++grep -q 'RT_SENSOR_DIAG_ID=2' build.sh
++grep -q 'build/SENSOR1.EXE=SENSOR1.EXE' build.sh
++grep -q 'build/SENSOR2.EXE=SENSOR2.EXE' build.sh
++
++grep -q 'SENSOR1: started ordinary EXE1' src/rt_sensor_diag.c
++grep -q 'SENSOR1: tick' src/rt_sensor_diag.c
++grep -q 'SENSOR1: ESC -> stopped' src/rt_sensor_diag.c
++grep -q 'SENSOR2: started ordinary EXE1' src/rt_sensor_diag.c
++grep -q 'SENSOR2: tick' src/rt_sensor_diag.c
++grep -q 'SENSOR2: ESC -> stopped' src/rt_sensor_diag.c
++
++grep -q 'rt_priority_compare' src/kernel.c
++grep -q 'rt_pick_ready' src/kernel.c
++
++grep -q 'make_exe1 build/rt_sensor1.raw build/SENSOR1.EXE 0' build.sh
++grep -q 'make_exe1 build/rt_sensor2.raw build/SENSOR2.EXE 0' build.sh
++
++cc=${CC:-gcc}
++tmpdir=${TMPDIR:-/tmp}
++tmp="$tmpdir/toyos_rt_stage43_$$"
++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
++mkdir -p "$tmp"
++$cc -std=c99 -Wall -Wextra -Werror tools/test_rtd_stage4_3.c -o "$tmp/test_rtd_stage4_3"
++"$tmp/test_rtd_stage4_3"
++
++echo 'RTD Stage 4.3 diagnostic SENSOR1/SENSOR2 checks passed'
+diff -ruN /tmp/st43base/toyos_stage42/src/rt_sensor_diag.c /tmp/st42/toyos_stage42/src/rt_sensor_diag.c
+--- /tmp/st43base/toyos_stage42/src/rt_sensor_diag.c	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/src/rt_sensor_diag.c	2026-09-18 10:18:42.769576524 +0000
+@@ -0,0 +1,52 @@
++/* RT priority diagnostic EXE1 source. Build twice with RT_SENSOR_DIAG_ID=1/2.
++ * Both outputs are ordinary ToyOS EXE1 programs; only the diagnostic prefix
++ * differs so simultaneous RT execution is visible on the console.
++ */
++#ifndef RT_SENSOR_DIAG_ID
++#define RT_SENSOR_DIAG_ID 1
++#endif
++#if RT_SENSOR_DIAG_ID == 1
++#define SENSOR_STARTED "SENSOR1: started ordinary EXE1 period="
++#define SENSOR_TICK "SENSOR1: tick\n"
++#define SENSOR_ESC "SENSOR1: ESC -> stopped\n"
++#define SENSOR_MISS "SENSOR1: deadline miss\n"
++#define SENSOR_FAIL "SENSOR1: RT wait FAIL\n"
++#elif RT_SENSOR_DIAG_ID == 2
++#define SENSOR_STARTED "SENSOR2: started ordinary EXE1 period="
++#define SENSOR_TICK "SENSOR2: tick\n"
++#define SENSOR_ESC "SENSOR2: ESC -> stopped\n"
++#define SENSOR_MISS "SENSOR2: deadline miss\n"
++#define SENSOR_FAIL "SENSOR2: RT wait FAIL\n"
++#else
++#error "RT_SENSOR_DIAG_ID must be 1 or 2"
++#endif
++
++typedef unsigned int uint32_t;
++typedef unsigned char uint8_t;
++#define SYS_CONSOLE_WRITE 1u
++#define SYS_CONSOLE_POLL 37u
++#define SYS_RT_INFO      39u
++#define SYS_RT_WAIT      40u
++#define SYS_EXIT         12u
++static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
++static void put(const char*s){uint32_t n=0;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
++static void put_u32(uint32_t v){char b[12];uint32_t i=0,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+(v%10u));v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
++__attribute__((section(".usertext"))) void program_main(void){
++    uint32_t info[8],period=20u,deadline=20u,priority=0u,wr;
++    uint8_t key=0u;
++    if(sc(SYS_RT_INFO,(uint32_t)info,0,0)==0u){period=info[0];deadline=info[1];priority=info[2];}
++    put(SENSOR_STARTED);put_u32(period);put("ms deadline=");put_u32(deadline);put("ms priority=");put_u32(priority);put(" (ESC to stop)\n");
++    for(;;){
++        if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put(SENSOR_ESC);sc(SYS_EXIT,0,0,0);for(;;){}}
++        put(SENSOR_TICK);
++        wr=sc(SYS_RT_WAIT,0,0,0);
++        if(wr==1u)put(SENSOR_MISS);
++        if(wr==0xffffffffu){put(SENSOR_FAIL);sc(SYS_EXIT,1,0,0);for(;;){}}
++    }
++}
++__asm__(
++".section .start,\"ax\"\n"
++".global _start\n"
++"_start:\n"
++"jmp _program_main\n"
++);
+diff -ruN /tmp/st43base/toyos_stage42/tools/test_rtd_stage4_3.c /tmp/st42/toyos_stage42/tools/test_rtd_stage4_3.c
+--- /tmp/st43base/toyos_stage42/tools/test_rtd_stage4_3.c	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/st42/toyos_stage42/tools/test_rtd_stage4_3.c	2026-09-18 10:18:43.419378180 +0000
+@@ -0,0 +1,38 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++static int contains(const char *file,const char *needle){
++    FILE *f;
++    long n;
++    char *buf;
++    size_t got;
++    int found;
++    f=fopen(file,"rb");
++    if(!f)return 0;
++    if(fseek(f,0,SEEK_END)!=0){fclose(f);return 0;}
++    n=ftell(f);
++    if(n<0){fclose(f);return 0;}
++    rewind(f);
++    buf=(char*)malloc((size_t)n+1u);
++    if(!buf){fclose(f);return 0;}
++    got=fread(buf,1,(size_t)n,f);
++    fclose(f);
++    buf[got]=0;
++    found=strstr(buf,needle)!=NULL;
++    free(buf);
++    return found;
++}
++
++int main(void){
++    if(!contains("src/rt_sensor_diag.c","SENSOR1: tick"))return 1;
++    if(!contains("src/rt_sensor_diag.c","SENSOR2: tick"))return 2;
++    if(!contains("src/rt_sensor_diag.c","SENSOR1: ESC -> stopped"))return 3;
++    if(!contains("src/rt_sensor_diag.c","SENSOR2: ESC -> stopped"))return 4;
++    if(!contains("build.sh","RT_SENSOR_DIAG_ID=1"))return 5;
++    if(!contains("build.sh","RT_SENSOR_DIAG_ID=2"))return 6;
++    if(!contains("build.sh","build/SENSOR1.EXE=SENSOR1.EXE"))return 7;
++    if(!contains("build.sh","build/SENSOR2.EXE=SENSOR2.EXE"))return 8;
++    puts("Stage 4.3 diagnostic source/build assertions passed");
++    return 0;
++}

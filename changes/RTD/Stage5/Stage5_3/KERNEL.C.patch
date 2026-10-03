@@ -1,0 +1,105 @@
+--- a/src/kernel.c	2026-09-18 13:28:24.000000000 +0000
++++ b/src/kernel.c	2026-09-18 13:56:04.938874679 +0000
+@@ -92,6 +92,7 @@
+ #define SYS_RT_TRACE       41u
+ #define SYS_RT_DEADLINE_INFO 42u
+ #define SYS_RT_STATUS      43u
++#define SYS_RT_JOB_INFO    44u
+ #define SCHED_TASKS      25u
+ #define EXECMT_MAX_TASKS 25u
+ #define RT_MAX_TASKS      4u
+@@ -561,6 +562,8 @@
+     uint32_t rt_runtime_ticks;
+     uint32_t rt_runtime_budget;
+     uint32_t rt_dispatch_seq;
++    uint32_t rt_job_sequence;
++    uint32_t rt_skipped_releases;
+ };
+ static struct sched_task sched_tasks[SCHED_TASKS];
+ static uint32_t sched_current;
+@@ -1864,17 +1867,22 @@
+    is anchored to that release and never shifted by dispatch latency. */
+ static void rt_begin_job(struct sched_task*t,uint32_t release_tick){
+     uint32_t dt=rt_deadline_ms_to_ticks(t->rt_deadline_ms);
++    t->rt_job_sequence++;
++    if(t->rt_job_sequence==0u)t->rt_job_sequence=1u;
+     t->rt_job_release_tick=release_tick;
+     t->rt_deadline_tick=rt_deadline_absolute(release_tick,dt);
+     t->rt_job_active=1u;
+     t->rt_job_missed=0u;
+     t->rt_runtime_ticks=0u;
+ }
+-static void rt_advance_release(struct sched_task*t,uint32_t now){
++static uint32_t rt_advance_release(struct sched_task*t,uint32_t now){
+     uint32_t pt=rt_deadline_ms_to_ticks(t->rt_period_ms);
+     uint32_t next=t->rt_next_release_tick+pt;
+-    while(rt_deadline_reached(now,next))next+=pt;
++    uint32_t skipped=0u;
++    next=rt_next_release_after(next,now,pt,&skipped);
+     t->rt_next_release_tick=next;
++    t->rt_skipped_releases+=skipped;
++    return skipped;
+ }
+ static uint32_t rt_recount_active(void){
+     uint32_t i,count=0u;
+@@ -1928,11 +1936,17 @@
+             uint32_t release=t->rt_next_release_tick;
+             rt_begin_job(t,release);
+             if(rt_deadline_reached(now,t->rt_deadline_tick)){
++                /* The release was reached too late even to execute the job.
++                   Count this release as an actual deadline miss, then skip
++                   any additional stale releases without creating a backlog. */
+                 t->rt_missed_deadlines++;
+                 t->rt_job_active=0u;
+                 rt_advance_release(t,now);
+                 t->rt_deadline_tick=rt_deadline_absolute(t->rt_next_release_tick,rt_deadline_ms_to_ticks(t->rt_deadline_ms));
+-                t->state=TASK_BLOCKED;
++                if(t->rt_next_release_tick==now){
++                    rt_begin_job(t,t->rt_next_release_tick);
++                    t->state=TASK_READY;
++                }else t->state=TASK_BLOCKED;
+             }else t->state=TASK_READY;
+         }
+         if(t->rt_job_active&&rt_deadline_reached(now,t->rt_deadline_tick)){
+@@ -1989,11 +2003,10 @@
+     sched_tasks[id].rt_period_ms=req.period_ms;sched_tasks[id].rt_deadline_ms=req.deadline_ms;sched_tasks[id].rt_priority=req.priority;
+     sched_tasks[id].rt_period_ticks=rt_deadline_ms_to_ticks(req.period_ms);
+     sched_tasks[id].rt_next_release_tick=timer_ticks;
+-    sched_tasks[id].rt_job_release_tick=timer_ticks;
+-    sched_tasks[id].rt_deadline_tick=rt_deadline_absolute(timer_ticks,rt_deadline_ms_to_ticks(req.deadline_ms));
+-    sched_tasks[id].rt_job_active=1u;
+-    sched_tasks[id].rt_job_missed=0u;
++    sched_tasks[id].rt_job_sequence=0u;
++    sched_tasks[id].rt_skipped_releases=0u;
+     sched_tasks[id].rt_missed_deadlines=0u;
++    rt_begin_job(&sched_tasks[id],timer_ticks);
+     sched_tasks[id].rt_runtime_budget=1u+
+         (sched_tasks[id].rt_period_ticks/255u)*req.priority+
+         ((sched_tasks[id].rt_period_ticks%255u)*req.priority)/255u;
+@@ -2039,10 +2052,14 @@
+         if(!t->rt_job_missed)t->rt_missed_deadlines++;
+         f->eax=1u;
+     }else f->eax=0u;
+-    dt=t->rt_period_ticks;next=t->rt_next_release_tick+dt;while(rt_deadline_reached(now,next))next+=dt;
+-    t->rt_next_release_tick=next;t->rt_deadline_tick=rt_deadline_absolute(next,rt_deadline_ms_to_ticks(t->rt_deadline_ms));
++    dt=t->rt_period_ticks;next=t->rt_next_release_tick+dt;
++    {uint32_t skipped=0u;next=rt_next_release_after(next,now,dt,&skipped);t->rt_next_release_tick=next;t->rt_skipped_releases+=skipped;}
+     t->rt_job_active=0u;t->rt_job_missed=0u;t->rt_runtime_ticks=0u;
+-    mem_copy(t->words,(const void*)f,MT_CONTEXT_WORDS*4u);t->state=TASK_BLOCKED;
++    mem_copy(t->words,(const void*)f,MT_CONTEXT_WORDS*4u);
++    if(next==now){
++        rt_begin_job(t,next);
++        t->state=TASK_READY;
++    }else t->state=TASK_BLOCKED;
+     {int nextid=rt_pick_ready();if(nextid>=0){rt_switch_to(f,nextid);return;}}
+     rt_switch_to_shell(f);
+ }
+@@ -2288,7 +2305,7 @@
+         case SYS_CONSOLE_WRITE:if((f->cs&3u)&&!user_range(a,b)){f->eax=0xffffffffu;break;}f->eax=(b&&a)?console_write_atomic_n((const char*)a,b):0;break;
+         case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch==KEY_EVENT_F10){rt_shell_waiting=0;rt_shell_hold=0u;f->eax=4u;break;}if(ch){rt_shell_waiting=0;rt_shell_hold=0u;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){if(rt_shell_hold){rt_shell_hold=0u;__asm__ volatile("sti;hlt;cli":::"memory");continue;}int rid=rt_pick_ready();if(rid>=0){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_task_id=(uint32_t)rid;sched_tasks[rid].state=TASK_RUNNING;sched_tasks[rid].switches++;rt_record_dispatch(rid);load_cr3(sched_tasks[rid].cr3);mem_copy((void*)f,sched_tasks[rid].words,MT_CONTEXT_WORDS*4u);break;}}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
+         case SYS_CONSOLE_POLL:{uint8_t ch=0;{int rid=rt_find_current();if(rid>=0){/* Detached RT owns only the explicit ESC stop event. All other keyboard bytes stay in the shell queue so interactive shell input cannot be consumed by SENSOR. */if(rt_stop_requested&(1u<<rid))ch=0x1bu;}else ch=key_pop();}if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
+-        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_TRACE:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=(uint32_t)rid;((uint32_t*)a)[1]=sched_tasks[rid].rt_priority;((uint32_t*)a)[2]=sched_tasks[rid].switches;((uint32_t*)a)[3]=sched_tasks[rid].rt_dispatch_seq;((uint32_t*)a)[4]=sched_tasks[rid].state;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_DEADLINE_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_job_release_tick;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[2]=timer_ticks;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
++        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_JOB_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,36u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_job_sequence;((uint32_t*)a)[1]=sched_tasks[rid].rt_job_release_tick;((uint32_t*)a)[2]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[3]=timer_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_missed;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;((uint32_t*)a)[8]=sched_tasks[rid].rt_skipped_releases;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_TRACE:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=(uint32_t)rid;((uint32_t*)a)[1]=sched_tasks[rid].rt_priority;((uint32_t*)a)[2]=sched_tasks[rid].switches;((uint32_t*)a)[3]=sched_tasks[rid].rt_dispatch_seq;((uint32_t*)a)[4]=sched_tasks[rid].state;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_DEADLINE_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_job_release_tick;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[2]=timer_ticks;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
+         case SYS_DISK_READ:if((f->cs&3u)&&(c>8u||!user_rw_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_read(a,(void*)b,c)?0:0xffffffffu;break;
+         case SYS_DISK_WRITE:if((f->cs&3u)&&(c>8u||!user_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_write(a,(const void*)b,c)?0:0xffffffffu;break;
+         case SYS_FILE_OPEN:if((f->cs&3u)&&!user_cstr(a)){f->eax=0xffffffffu;break;}f->eax=(uint32_t)fat_open((const char*)a,b);break;

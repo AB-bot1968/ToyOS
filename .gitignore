@@ -1,0 +1,51 @@
+# ===== ToyOS generated build outputs =====
+/build/
+/dist/
+*.o
+*.pe
+*.map
+*.lst
+*.tmp
+
+# Generated host utilities
+/tools/PNG2RAW.EXE
+
+# QEMU/runtime artifacts
+*.log
+*.sav
+*.qcow2
+*.vmdk
+*.vdi
+
+# Generic generated disk/image outputs.
+# Required project fixtures/resources are explicitly unignored below.
+*.img
+*.iso
+*.raw
+*.bin
+
+# Required versioned binary resources / fixtures
+!resources/SPLASH.RAW
+!tools/Python/TEST.BIN
+
+# Editor/OS noise
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local Git/release notes and credentials
+.git-user-notes/
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*

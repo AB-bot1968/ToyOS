@@ -1,0 +1,17 @@
+name: ToyOS publication preflight
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  source-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run stable-baseline preflight
+        run: sh ./git_preflight.sh
+
+# This workflow validates source/release integrity only.
+# The authoritative full build remains Windows 7/W64DevKit x86 + runtime QEMU tests.

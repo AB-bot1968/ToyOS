@@ -1,0 +1,4 @@
+# Stage 5.2 FIX2 patch set
+# See STAGE5_2_FIX2_KERNEL.patch and STAGE5_2_FIX2_RTD.patch.
+# Main changes: active RT slot recount, SYS_RT_STATUS=43, improved -1 diagnostics,
+# Stage 5.2 FIX2 regression test and build.sh integration.

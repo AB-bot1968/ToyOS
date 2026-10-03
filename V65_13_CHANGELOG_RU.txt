@@ -1,0 +1,8 @@
+v65.13 — PNG2RAW без System.Drawing
+
+Исправлена ошибка PNG2RAW на Windows 7:
+- полностью удалена зависимость от System.Drawing.Bitmap/GDI+;
+- PNG разбирается напрямую по chunk-ам PNG;
+- IDAT распаковывается через встроенный .NET DeflateStream;
+- вместо Stream.CopyTo используется Read/Write для совместимости со старыми .NET;
+- результат по-прежнему 320x200, 256 цветов, 64000 байт RAW.

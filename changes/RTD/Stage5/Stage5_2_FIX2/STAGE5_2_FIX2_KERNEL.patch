@@ -1,0 +1,66 @@
+diff --git a/tmp/toyos_s52fix1/stage52_fix1/src/kernel.c b/src/kernel.c
+index ac143af..82555d9 100644
+--- a/tmp/toyos_s52fix1/stage52_fix1/src/kernel.c
++++ b/src/kernel.c
+@@ -91,6 +91,7 @@ typedef int int32_t;
+ #define SYS_RT_WAIT        40u
+ #define SYS_RT_TRACE       41u
+ #define SYS_RT_DEADLINE_INFO 42u
++#define SYS_RT_STATUS      43u
+ #define SCHED_TASKS      25u
+ #define EXECMT_MAX_TASKS 25u
+ #define RT_MAX_TASKS      4u
+@@ -1875,6 +1876,16 @@ static void rt_advance_release(struct sched_task*t,uint32_t now){
+     while(rt_deadline_reached(now,next))next+=pt;
+     t->rt_next_release_tick=next;
+ }
++static uint32_t rt_recount_active(void){
++    uint32_t i,count=0u;
++    for(i=0;i<RT_MAX_TASKS;i++){
++        if((sched_tasks[i].state==TASK_READY||sched_tasks[i].state==TASK_RUNNING||sched_tasks[i].state==TASK_BLOCKED)&&
++           sched_tasks[i].rt_period_ms!=0u)count++;
++    }
++    rt_task_count=count;
++    rt_background_active=(count!=0u)?1u:0u;
++    return count;
++}
+ static int rt_find_current(void){
+     uint32_t cr3=read_cr3(),i;
+     if(!rt_background_active)return -1;
+@@ -1950,7 +1961,7 @@ static int rt_start_task(uint32_t p,struct frame*f){
+     if((f->cs&3u)==0u)return EXE_ERR_BUSY;
+     if(sched_active||queue_active)return EXE_ERR_BUSY;
+     if(!exe_active)return EXE_ERR_BUSY;
+-    if(rt_task_count>=RT_MAX_TASKS)return EXE_ERR_BUSY;
++    rt_recount_active();
+     n=0;while(n<QUEUE_NAME_SIZE&&req.name[n])n++;
+     if(n==0u||n>=QUEUE_NAME_SIZE)return EXE_ERR_NAME;
+     if(req.period_ms==0u||req.deadline_ms==0u||req.deadline_ms>req.period_ms)return EXE_ERR_NAME;
+@@ -1989,7 +2000,7 @@ static int rt_start_task(uint32_t p,struct frame*f){
+     if(sched_tasks[id].rt_runtime_budget>sched_tasks[id].rt_period_ticks)sched_tasks[id].rt_runtime_budget=sched_tasks[id].rt_period_ticks;
+     if(sched_tasks[id].rt_runtime_budget==0u)sched_tasks[id].rt_runtime_budget=1u;
+     sched_tasks[id].rt_runtime_ticks=0u;sched_tasks[id].rt_dispatch_seq=0u;sched_tasks[id].state=TASK_READY;
+-    rt_stop_requested&=~(1u<<id);rt_task_count++;rt_background_active=1u;
++    rt_stop_requested&=~(1u<<id);rt_recount_active();
+     if(rt_task_count==1u){
+         rt_task_id=id;rt_started_tick=timer_ticks;sched_saved_shell_cr3=read_cr3();
+         mem_copy(rt_shell_frame,saved_user_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_shell_waiting=0u;rt_shell_hold=0u;
+@@ -2040,7 +2051,7 @@ static void rt_exit(struct frame*f){
+     if(id<0){f->eax=0xffffffffu;return;}
+     mem_copy(sched_tasks[id].words,(const void*)f,MT_CONTEXT_WORDS*4u);
+     sched_tasks[id].state=TASK_EXIT;rt_stop_requested&=~(1u<<id);
+-    if(rt_task_count)rt_task_count--;
++    rt_recount_active();
+     if(rt_task_count==0u){
+         rt_background_active=0u;load_cr3(sched_saved_shell_cr3);
+         if(rt_shell_frame_valid)mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+@@ -2295,7 +2306,8 @@ void interrupt_dispatch(struct frame*f){uint32_t n=f->int_no;if(n==32){timer_tic
+         case SYS_EXECMT:{int r;if((f->cs&3u)&&((b==0u)||(b>EXECMT_MAX_TASKS)||!user_range(a,b*QUEUE_NAME_SIZE))){f->eax=0xffffffffu;break;}r=execmt_prepare(a,b,f);f->eax=(uint32_t)r;}break;case SYS_MT_START:if(f->cs&3u)sched_start(f);else f->eax=0xffffffffu;break;case SYS_SCHED_BLOCK:if(f->cs&3u)sched_block(f);else f->eax=0xffffffffu;break;case SYS_SCHED_WAKE:if(f->cs&3u)sched_wake(f);else f->eax=0xffffffffu;break;case SYS_SCHED_EXIT:if(f->cs&3u){if(rt_find_current()>=0)rt_exit(f);else if(sched_active)sched_exit(f);else exe_exit(f);}else f->eax=0xffffffffu;break;
+         case SYS_MT_STOP:if(f->cs&3u)sched_stop(f);else f->eax=0xffffffffu;break;
+         case SYS_EXEC:if(rt_find_current()>=0){f->eax=(uint32_t)EXE_ERR_BUSY;break;}if((f->cs&3u)&&!user_cstr(a)){f->eax=(uint32_t)EXE_ERR_NAME;break;}f->eax=(uint32_t)exe_load((const char*)a,f);break;
+-        case SYS_RT_START:{int r;if((f->cs&3u)&&!user_range(a,sizeof(struct rt_start_request))){f->eax=(uint32_t)EXE_ERR_NAME;break;}r=rt_start_task(a,f);f->eax=(uint32_t)r;break;}
++        case SYS_RT_START:{int r;rt_recount_active();if((f->cs&3u)&&!user_range(a,sizeof(struct rt_start_request))){f->eax=(uint32_t)EXE_ERR_NAME;break;}r=rt_start_task(a,f);f->eax=(uint32_t)r;break;}
++        case SYS_RT_STATUS:if((f->cs&3u)&&a&&user_rw_range(a,16u)){uint32_t i,active=0u;rt_recount_active();for(i=0;i<RT_MAX_TASKS;i++)if(sched_tasks[i].state==TASK_READY||sched_tasks[i].state==TASK_RUNNING||sched_tasks[i].state==TASK_BLOCKED)active++;((uint32_t*)a)[0]=active;((uint32_t*)a)[1]=RT_MAX_TASKS-active;((uint32_t*)a)[2]=rt_background_active;((uint32_t*)a)[3]=rt_task_id;f->eax=0;}else f->eax=0xffffffffu;break;
+         case SYS_EXEC_ARGS:{int r;if(rt_find_current()>=0){f->eax=(uint32_t)EXE_ERR_BUSY;break;}if((f->cs&3u)&&(!user_cstr(a)||!copy_exec_args(b))){f->eax=(uint32_t)EXE_ERR_NAME;break;}mem_copy(exe_args, (const void*)b, EXEC_ARG_BLOCK_SIZE);r=exe_load_args((const char*)a,f,exe_args);f->eax=(uint32_t)r;break;}
+ 
+         /* EXECMT tasks are ordinary EXE1 images, so existing SYS_EXIT must

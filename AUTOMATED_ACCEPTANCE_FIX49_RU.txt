@@ -1,0 +1,58 @@
+FIX49 — ПОЛНАЯ АВТОМАТИЧЕСКАЯ ПРИЕМКА
+======================================
+
+Сначала выполнить новый расширенный acceptance-тест:
+  test TESTACC.TST
+
+Он заменяет основную ручную приемку и проверяет:
+- чистое начальное состояние;
+- MT lifecycle (4 задачи);
+- нечувствительность команд к регистру;
+- RT lifecycle (4 задачи);
+- реальный прогресс каждого RT slot;
+- наличие completed-job history для RTSTAT DUMP;
+- RTSTAT STOP SLOT1..SLOT4 и уменьшение RT_ACTIVE после каждого STOP;
+- supervisor fault/restart/budget/SAFE chain;
+- наличие FAULT/DEGRADED/RESTART/BUDGET/SAFE;
+- строгую монотонность event sequence;
+- неубывающий event tick;
+- сохранение recovery chain в EVENT.LOG;
+- монотонность sequence в сохраненном EVENT.LOG;
+- операторский возврат в NORMAL;
+- финальную очистку MT/RT/process handles/HWWD/health.
+
+Затем полный regression-набор:
+  test TESTLOAD.TST
+  test TESTKEY.TST
+  test TESTEVT.TST
+  test TESTLOG.TST
+  test TESTBOOT.TST
+  test TESTSAFE.TST
+  test TESTPOL.TST
+  test TESTHWWD.TST
+  test TESTHLTH.TST
+  test TESTSFP.TST
+  test TESTHB.TST
+  test TESTWD.TST
+  test TESTSUP.TST
+  test TESTRES.TST
+  test TESTPROC.TST
+  test TESTCORE.TST
+  test TESTRCV.TST
+
+Финальный повтор после всей нагрузки:
+  test TESTACC.TST
+  test TESTCORE.TST
+  test TESTRES.TST
+  test TESTPROC.TST
+
+КРИТЕРИЙ ПРИЕМКИ:
+Каждый запуск TEST должен завершиться FAIL=0.
+Любой FAIL>0 означает, что версия не фиксируется как CURRENT STABLE.
+
+ОГРАНИЧЕНИЕ:
+Автоматика проверяет структурированное состояние и реальный прогресс RT,
+но не может доказать чисто визуальные свойства VGA-консоли (например,
+эстетику перерисовки RTSTAT WATCH). Для функциональной приемки FIX49
+ручной прогон больше не требуется; визуальную проверку можно оставить
+необязательной smoke-проверкой.

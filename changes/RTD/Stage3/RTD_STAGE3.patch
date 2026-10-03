@@ -1,0 +1,1194 @@
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/README.md toyos3/README.md
+--- base3/README.md	2026-09-16 20:02:28.000000000 +0000
++++ toyos3/README.md	2026-09-18 08:01:30.332812732 +0000
+@@ -728,3 +728,28 @@
+ ## v66.11 — UDP telemetry console dashboard
+ 
+ Следующая версия после проверенной v66.10. Передача UDP не меняется по смыслу; переработан фиксированный dashboard Master/Slave без накопления диагностических строк.
++
++## v67 RTD Stage 3 — несколько одновременно работающих RT-задач
++
++Stage 3 построен от зафиксированной `ToyOS v67 RTD Stage 2 FIX2` и добавляет
++до четырёх одновременно активных detached RT-задач. Каждая задача использует
++собственный CR3, image slot, stack и сохранённый контекст существующего
++scheduler. Shell сохраняет отдельный FIX2 context.
++
++Пример:
++
++```text
++exec RTD.EXE SENSOR.EXE 20 20 3
++exec RTD.EXE SENSOR.EXE 40 40 7
++```
++
++Обе программы остаются обычными EXE1. Периодические release/deadline state
++ведутся независимо. `ESC` адресуется текущей RT-задаче. Ограничение — четыре
++одновременно активных RT-задачи.
++
++Priority arbitration между несколькими готовыми RT-задачами намеренно не
++перенесён в Stage 3: здесь добавляется именно многозадачность; отдельный
++следующий этап может изменить выбор готовой задачи на fixed-priority policy.
++
++Подробности: `RELEASE_NOTES_V67_RTD_STAGE3_RU.md` и
++`TEST_PLAN_V67_RTD_STAGE3_RU.md`.
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/RELEASE_NOTES_V67_RTD_STAGE3_RU.md toyos3/RELEASE_NOTES_V67_RTD_STAGE3_RU.md
+--- base3/RELEASE_NOTES_V67_RTD_STAGE3_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ toyos3/RELEASE_NOTES_V67_RTD_STAGE3_RU.md	2026-09-18 07:59:46.678019636 +0000
+@@ -0,0 +1,231 @@
++# ToyOS v67 RTD — Stage 3: несколько одновременно работающих RT-задач
++
++## 1. База
++
++Stage 3 разработан непосредственно от зафиксированной рабочей версии
++**ToyOS v67 RTD Stage 2 FIX2**.
++
++FIX2 считается неизменяемой контрольной точкой. В Stage 3 не изменялись:
++
++- механизм `ESC` и завершения `SENSOR.EXE`;
++- восстановление приглашения `toy0>`;
++- исправление `EXC 14`, связанное с сохранением Ring-3 shell frame;
++- `SYS_RT_WAIT` как механизм окончания периодической job;
++- существующий PIT 50 Hz;
++- существующий EXE1 loader и формат EXE1;
++- существующий EXECMT scheduler и его syscall ABI.
++
++## 2. Цель Stage 3
++
++В FIX2 одновременно существовала только одна detached RT-задача. Это не
++позволяло проверить совместную работу нескольких независимых периодических
++задач.
++
++Stage 3 меняет только модель владения RT-слотами:
++
++```text
++FIX2:
++    shell + RT0
++
++Stage 3:
++    shell + RT0 + RT1 + RT2 + RT3
++```
++
++Поддерживается до **4** одновременно активных detached RT-задач.
++
++## 3. Изменение 1 — RT task pool
++
++Добавлено:
++
++```c
++#define RT_MAX_TASKS 4u
++```
++
++В существующем `sched_tasks[]` используются первые четыре слота.
++Каждый RT-слот сохраняет:
++
++- собственный CR3;
++- собственный image slot;
++- собственный stack;
++- собственный interrupt context;
++- period/deadline/priority;
++- состояние текущей job;
++- счётчик deadline miss.
++
++Новая отдельная таблица контекстов не вводилась.
++
++## 4. Изменение 2 — подсчёт активных RT-задач
++
++Добавлен:
++
++```c
++static volatile uint32_t rt_task_count;
++```
++
++Первая задача создаёт общий shell context FIX2.
++Последующие задачи используют тот же сохранённый shell context и не
++перезаписывают его.
++
++При завершении одной RT-задачи `rt_task_count` уменьшается. Shell
++восстанавливается только после завершения последней активной RT-задачи.
++
++## 5. Изменение 3 — поиск текущей RT-задачи
++
++Добавлен `rt_find_current()`.
++
++Он определяет текущую RT-задачу по CR3 текущего Ring-3 контекста.
++Это устраняет зависимость системных вызовов от одного глобального
++`rt_task_id`.
++
++Используется для:
++
++- `SYS_RT_WAIT`;
++- `SYS_RT_INFO`;
++- `SYS_CONSOLE_POLL`;
++- `SYS_EXIT`;
++- `SYS_SCHED_EXIT`;
++- запрета обычного `exec` из RT-задачи.
++
++## 6. Изменение 4 — выбор готовой RT-задачи
++
++Добавлен `rt_pick_ready()`.
++
++Stage 3 намеренно выбирает готовую job по абсолютному deadline, а при
++равном deadline — по номеру RT-слота.
++
++Это сделано специально, чтобы не смешивать два изменения:
++
++1. Stage 3 — несколько RT-задач;
++2. следующий этап — arbitration по `priority`.
++
++`priority` уже существует и учитывается в бюджетировании, как было введено
++в Stage 2. Изменение порядка выбора по priority отложено до отдельного этапа.
++
++## 7. Изменение 5 — одновременные release/deadline
++
++Добавлен `rt_release_jobs()`.
++
++Каждый PIT tick проверяет **все четыре RT-слота**.
++
++Для каждой задачи независимо:
++
++```text
++next_release
++      ↓
++   job active
++      ↓
++   deadline
++      ↓
++ SYS_RT_WAIT
++      ↓
++ следующий release
++```
++
++Deadline miss одной задачи не меняет параметры другой.
++
++## 8. Изменение 6 — запуск второй и последующих задач
++
++`SYS_RT_START` больше не возвращает `EXE_ERR_BUSY` только потому, что уже
++существует RT-задача.
++
++RTD можно запускать повторно из shell:
++
++```text
++exec RTD.EXE SENSOR.EXE 20 20 3
++exec RTD.EXE SENSOR.EXE 40 40 7
++```
++
++В результате существуют две независимые копии `SENSOR.EXE`, каждая в своём
++CR3 и image slot.
++
++Максимум:
++
++```text
++RT0 + RT1 + RT2 + RT3
++```
++
++Пятая попытка возвращает `EXE_ERR_BUSY`.
++
++## 9. Изменение 7 — SYS_RT_WAIT
++
++`SYS_RT_WAIT` теперь определяет вызывающую RT-задачу через `rt_find_current()`.
++
++Контекст сохраняется в `sched_tasks[id].words`, после чего именно эта задача
++переходит в `TASK_BLOCKED`.
++
++Если готова другая RT-задача, CPU передаётся ей. Если готовых RT-задач нет,
++восстанавливается shell.
++
++## 10. Изменение 8 — ESC
++
++`rt_stop_requested` теперь является bit mask:
++
++```text
++bit 0 → RT0
++bit 1 → RT1
++bit 2 → RT2
++bit 3 → RT3
++```
++
++ESC относится к текущей RT-задаче.
++
++Это сохраняет проверенный FIX2 принцип, но позволяет завершать задачи
++независимо друг от друга.
++
++После `SYS_EXIT` бит соответствующей задачи очищается.
++
++## 11. Изменение 9 — память Ring-3
++
++`user_range()` и `user_rw_range()` теперь распознают image всех активных RT
++слотов, а не только одного `rt_task_id`.
++
++При этом виртуальный адрес остаётся прежним: изолированность обеспечивается
++разными CR3.
++
++## 12. Изменение 10 — shell frame / EXC 14
++
++Ключевой FIX2 invariant сохранён:
++
++> IRQ0 никогда не записывает Ring-0 interrupt frame в `rt_shell_frame`.
++
++Shell frame захватывается только при `SYS_CONSOLE_READ` из Ring 3.
++
++Это изменение Stage 3 не отменяет и не ослабляет исправление FIX2.
++
++## 13. Пользовательский интерфейс
++
++Существующая команда остаётся:
++
++```text
++exec RTD.EXE SENSOR.EXE PERIOD_MS DEADLINE_MS PRIORITY [DELAY_MS]
++```
++
++Пример двух задач:
++
++```text
++exec RTD.EXE SENSOR.EXE 20 20 3
++exec RTD.EXE SENSOR.EXE 40 40 7
++```
++
++Обе являются обычными EXE1-программами.
++
++## 14. Что Stage 3 сознательно НЕ делает
++
++Stage 3 не меняет:
++
++- PIT 50 Hz;
++- реальный 10-ms interrupt timebase;
++- priority arbitration;
++- новый EDF/fixed-priority scheduler;
++- EXE1 ABI.
++
++Это отдельные последующие этапы.
++
++## 15. Контрольная точка
++
++Если runtime-тест Stage 3 обнаружит проблему, откат выполняется непосредственно
++к:
++
++**ToyOS v67 RTD Stage 2 FIX2**.
++
++Не требуется откатывать более ранние FIX1/FIX2 исправления shell/ESC.
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/RTD_STAGE3.patch toyos3/RTD_STAGE3.patch
+--- base3/RTD_STAGE3.patch	1970-01-01 00:00:00.000000000 +0000
++++ toyos3/RTD_STAGE3.patch	2026-09-18 08:01:30.368813307 +0000
+@@ -0,0 +1,267 @@
++diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/README.md toyos3/README.md
++--- base3/README.md	2026-09-16 20:02:28.000000000 +0000
+++++ toyos3/README.md	2026-09-18 08:01:30.332812732 +0000
++@@ -728,3 +728,28 @@
++ ## v66.11 — UDP telemetry console dashboard
++ 
++ Следующая версия после проверенной v66.10. Передача UDP не меняется по смыслу; переработан фиксированный dashboard Master/Slave без накопления диагностических строк.
+++
+++## v67 RTD Stage 3 — несколько одновременно работающих RT-задач
+++
+++Stage 3 построен от зафиксированной `ToyOS v67 RTD Stage 2 FIX2` и добавляет
+++до четырёх одновременно активных detached RT-задач. Каждая задача использует
+++собственный CR3, image slot, stack и сохранённый контекст существующего
+++scheduler. Shell сохраняет отдельный FIX2 context.
+++
+++Пример:
+++
+++```text
+++exec RTD.EXE SENSOR.EXE 20 20 3
+++exec RTD.EXE SENSOR.EXE 40 40 7
+++```
+++
+++Обе программы остаются обычными EXE1. Периодические release/deadline state
+++ведутся независимо. `ESC` адресуется текущей RT-задаче. Ограничение — четыре
+++одновременно активных RT-задачи.
+++
+++Priority arbitration между несколькими готовыми RT-задачами намеренно не
+++перенесён в Stage 3: здесь добавляется именно многозадачность; отдельный
+++следующий этап может изменить выбор готовой задачи на fixed-priority policy.
+++
+++Подробности: `RELEASE_NOTES_V67_RTD_STAGE3_RU.md` и
+++`TEST_PLAN_V67_RTD_STAGE3_RU.md`.
++diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/RELEASE_NOTES_V67_RTD_STAGE3_RU.md toyos3/RELEASE_NOTES_V67_RTD_STAGE3_RU.md
++--- base3/RELEASE_NOTES_V67_RTD_STAGE3_RU.md	1970-01-01 00:00:00.000000000 +0000
+++++ toyos3/RELEASE_NOTES_V67_RTD_STAGE3_RU.md	2026-09-18 07:59:46.678019636 +0000
++@@ -0,0 +1,231 @@
+++# ToyOS v67 RTD — Stage 3: несколько одновременно работающих RT-задач
+++
+++## 1. База
+++
+++Stage 3 разработан непосредственно от зафиксированной рабочей версии
+++**ToyOS v67 RTD Stage 2 FIX2**.
+++
+++FIX2 считается неизменяемой контрольной точкой. В Stage 3 не изменялись:
+++
+++- механизм `ESC` и завершения `SENSOR.EXE`;
+++- восстановление приглашения `toy0>`;
+++- исправление `EXC 14`, связанное с сохранением Ring-3 shell frame;
+++- `SYS_RT_WAIT` как механизм окончания периодической job;
+++- существующий PIT 50 Hz;
+++- существующий EXE1 loader и формат EXE1;
+++- существующий EXECMT scheduler и его syscall ABI.
+++
+++## 2. Цель Stage 3
+++
+++В FIX2 одновременно существовала только одна detached RT-задача. Это не
+++позволяло проверить совместную работу нескольких независимых периодических
+++задач.
+++
+++Stage 3 меняет только модель владения RT-слотами:
+++
+++```text
+++FIX2:
+++    shell + RT0
+++
+++Stage 3:
+++    shell + RT0 + RT1 + RT2 + RT3
+++```
+++
+++Поддерживается до **4** одновременно активных detached RT-задач.
+++
+++## 3. Изменение 1 — RT task pool
+++
+++Добавлено:
+++
+++```c
+++#define RT_MAX_TASKS 4u
+++```
+++
+++В существующем `sched_tasks[]` используются первые четыре слота.
+++Каждый RT-слот сохраняет:
+++
+++- собственный CR3;
+++- собственный image slot;
+++- собственный stack;
+++- собственный interrupt context;
+++- period/deadline/priority;
+++- состояние текущей job;
+++- счётчик deadline miss.
+++
+++Новая отдельная таблица контекстов не вводилась.
+++
+++## 4. Изменение 2 — подсчёт активных RT-задач
+++
+++Добавлен:
+++
+++```c
+++static volatile uint32_t rt_task_count;
+++```
+++
+++Первая задача создаёт общий shell context FIX2.
+++Последующие задачи используют тот же сохранённый shell context и не
+++перезаписывают его.
+++
+++При завершении одной RT-задачи `rt_task_count` уменьшается. Shell
+++восстанавливается только после завершения последней активной RT-задачи.
+++
+++## 5. Изменение 3 — поиск текущей RT-задачи
+++
+++Добавлен `rt_find_current()`.
+++
+++Он определяет текущую RT-задачу по CR3 текущего Ring-3 контекста.
+++Это устраняет зависимость системных вызовов от одного глобального
+++`rt_task_id`.
+++
+++Используется для:
+++
+++- `SYS_RT_WAIT`;
+++- `SYS_RT_INFO`;
+++- `SYS_CONSOLE_POLL`;
+++- `SYS_EXIT`;
+++- `SYS_SCHED_EXIT`;
+++- запрета обычного `exec` из RT-задачи.
+++
+++## 6. Изменение 4 — выбор готовой RT-задачи
+++
+++Добавлен `rt_pick_ready()`.
+++
+++Stage 3 намеренно выбирает готовую job по абсолютному deadline, а при
+++равном deadline — по номеру RT-слота.
+++
+++Это сделано специально, чтобы не смешивать два изменения:
+++
+++1. Stage 3 — несколько RT-задач;
+++2. следующий этап — arbitration по `priority`.
+++
+++`priority` уже существует и учитывается в бюджетировании, как было введено
+++в Stage 2. Изменение порядка выбора по priority отложено до отдельного этапа.
+++
+++## 7. Изменение 5 — одновременные release/deadline
+++
+++Добавлен `rt_release_jobs()`.
+++
+++Каждый PIT tick проверяет **все четыре RT-слота**.
+++
+++Для каждой задачи независимо:
+++
+++```text
+++next_release
+++      ↓
+++   job active
+++      ↓
+++   deadline
+++      ↓
+++ SYS_RT_WAIT
+++      ↓
+++ следующий release
+++```
+++
+++Deadline miss одной задачи не меняет параметры другой.
+++
+++## 8. Изменение 6 — запуск второй и последующих задач
+++
+++`SYS_RT_START` больше не возвращает `EXE_ERR_BUSY` только потому, что уже
+++существует RT-задача.
+++
+++RTD можно запускать повторно из shell:
+++
+++```text
+++exec RTD.EXE SENSOR.EXE 20 20 3
+++exec RTD.EXE SENSOR.EXE 40 40 7
+++```
+++
+++В результате существуют две независимые копии `SENSOR.EXE`, каждая в своём
+++CR3 и image slot.
+++
+++Максимум:
+++
+++```text
+++RT0 + RT1 + RT2 + RT3
+++```
+++
+++Пятая попытка возвращает `EXE_ERR_BUSY`.
+++
+++## 9. Изменение 7 — SYS_RT_WAIT
+++
+++`SYS_RT_WAIT` теперь определяет вызывающую RT-задачу через `rt_find_current()`.
+++
+++Контекст сохраняется в `sched_tasks[id].words`, после чего именно эта задача
+++переходит в `TASK_BLOCKED`.
+++
+++Если готова другая RT-задача, CPU передаётся ей. Если готовых RT-задач нет,
+++восстанавливается shell.
+++
+++## 10. Изменение 8 — ESC
+++
+++`rt_stop_requested` теперь является bit mask:
+++
+++```text
+++bit 0 → RT0
+++bit 1 → RT1
+++bit 2 → RT2
+++bit 3 → RT3
+++```
+++
+++ESC относится к текущей RT-задаче.
+++
+++Это сохраняет проверенный FIX2 принцип, но позволяет завершать задачи
+++независимо друг от друга.
+++
+++После `SYS_EXIT` бит соответствующей задачи очищается.
+++
+++## 11. Изменение 9 — память Ring-3
+++
+++`user_range()` и `user_rw_range()` теперь распознают image всех активных RT
+++слотов, а не только одного `rt_task_id`.
+++
+++При этом виртуальный адрес остаётся прежним: изолированность обеспечивается
+++разными CR3.
+++
+++## 12. Изменение 10 — shell frame / EXC 14
+++
+++Ключевой FIX2 invariant сохранён:
+++
+++> IRQ0 никогда не записывает Ring-0 interrupt frame в `rt_shell_frame`.
+++
+++Shell frame захватывается только при `SYS_CONSOLE_READ` из Ring 3.
+++
+++Это изменение Stage 3 не отменяет и не ослабляет исправление FIX2.
+++
+++## 13. Пользовательский интерфейс
+++
+++Существующая команда остаётся:
+++
+++```text
+++exec RTD.EXE SENSOR.EXE PERIOD_MS DEADLINE_MS PRIORITY [DELAY_MS]
+++```
+++
+++Пример двух задач:
+++
+++```text
+++exec RTD.EXE SENSOR.EXE 20 20 3
+++exec RTD.EXE SENSOR.EXE 40 40 7
+++```
+++
+++Обе являются обычными EXE1-программами.
+++
+++## 14. Что Stage 3 сознательно НЕ делает
+++
+++Stage 3 не меняет:
+++
+++- PIT 50 Hz;
+++- реальный 10-ms interrupt timebase;
+++- priority arbitration;
+++- новый EDF/fixed-priority scheduler;
+++- EXE1 ABI.
+++
+++Это отдельные последующие этапы.
+++
+++## 15. Контрольная точка
+++
+++Если runtime-тест Stage 3 обнаружит проблему, откат выполняется непосредственно
+++к:
+++
+++**ToyOS v67 RTD Stage 2 FIX2**.
+++
+++Не требуется откатывать более ранние FIX1/FIX2 исправления shell/ESC.
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/TEST_PLAN_V67_RTD_STAGE3_RU.md toyos3/TEST_PLAN_V67_RTD_STAGE3_RU.md
+--- base3/TEST_PLAN_V67_RTD_STAGE3_RU.md	1970-01-01 00:00:00.000000000 +0000
++++ toyos3/TEST_PLAN_V67_RTD_STAGE3_RU.md	2026-09-18 07:59:46.678866682 +0000
+@@ -0,0 +1,136 @@
++# Test Plan — ToyOS v67 RTD Stage 3
++
++## Контрольная версия
++
++База: `ToyOS v67 RTD Stage 2 FIX2`.
++
++## Шаг 0 — статическая проверка
++
++Запустить:
++
++```sh
++sh ./check_rtd_stage3.sh
++```
++
++Ожидается:
++
++```text
++RTD stage 3 checks passed
++```
++
++## Шаг 1 — компиляция
++
++Обязательно отдельно компилируются:
++
++- `src/kernel.c`;
++- `src/user_shell.c`;
++- `src/rtd.c`;
++- `src/rt_sensor.c`.
++
++Все четыре должны пройти 32-bit freestanding compilation.
++
++## Шаг 2 — одна RT-задача, регрессия FIX2
++
++```text
++exec RTD.EXE SENSOR.EXE 20 20 3
++```
++
++Проверить:
++
++1. появляются `SENSOR: tick`;
++2. задача не зависает после первого `SYS_RT_WAIT`;
++3. ESC даёт `SENSOR: ESC -> stopped`;
++4. появляется `toy0>`;
++5. shell принимает следующую команду.
++
++## Шаг 3 — две задачи
++
++Сначала:
++
++```text
++exec RTD.EXE SENSOR.EXE 20 20 3
++```
++
++затем из вернувшегося shell:
++
++```text
++exec RTD.EXE SENSOR.EXE 40 40 7
++```
++
++Ожидается:
++
++- продолжаются tick обеих независимых копий;
++- более частая задача имеет период около 20 ms;
++- вторая — около 40 ms;
++- shell остаётся отзывчивым;
++- нет `EXC 14`.
++
++Так как обе программы печатают одинаковую строку, для точного различения
++рекомендуется на runtime-тесте временно добавить в диагностический вывод
++номер RT slot либо использовать разные периодические программы. Это не
++требуется для проверки изоляции контекстов.
++
++## Шаг 4 — независимое завершение
++
++Нажать ESC.
++
++Должна завершиться текущая RT-задача:
++
++```text
++SENSOR: ESC -> stopped
++toy0>
++```
++
++Если вторая задача остаётся активной, её `tick` должны продолжаться.
++
++Повторное ESC должно позволить завершить оставшуюся RT-задачу.
++
++После завершения последней должна появиться:
++
++```text
++toy0>
++```
++
++## Шаг 5 — три задачи
++
++```text
++exec RTD.EXE SENSOR.EXE 20 20 1
++exec RTD.EXE SENSOR.EXE 40 40 2
++exec RTD.EXE SENSOR.EXE 100 100 3
++```
++
++Проверить независимость release/deadline state.
++
++## Шаг 6 — четыре задачи
++
++Запустить четыре экземпляра.
++Пятая команда должна закончиться `EXE_ERR_BUSY`.
++
++## Шаг 7 — задержка запуска
++
++Проверить одновременно:
++
++```text
++exec RTD.EXE SENSOR.EXE 20 20 3 3000
++exec RTD.EXE SENSOR.EXE 40 40 7
++```
++
++Задержка относится только к создаваемой задаче и не должна изменять период
++уже работающей задачи.
++
++## Шаг 8 — регрессия EXE1
++
++Проверить обычные команды shell и обычный `exec` после завершения RT-задач.
++
++## Шаг 9 — регрессия EXECMT
++
++Проверить существующий `execmt`/`SYS_MT_START` после того, как все RT-задачи
++завершены.
++
++Пока RT-задачи активны, запуск EXECMT должен оставаться запрещённым, как в
++предыдущих версиях.
++
++## Ограничение среды разработки
++
++Если `qemu-system-i386` отсутствует, runtime-тест не считается выполненным.
++Статическая компиляция и focused checks не заменяют boot/runtime test.
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/build.sh toyos3/build.sh
+--- base3/build.sh	2026-09-17 16:03:40.000000000 +0000
++++ toyos3/build.sh	2026-09-18 07:59:47.144193462 +0000
+@@ -332,6 +332,7 @@
+ sh ./check_rtd_stage1_fix3.sh
+ sh ./check_rtd_stage1_fix6.sh
+ sh ./check_rtd_stage2.sh
++sh ./check_rtd_stage3.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/check_rtd_stage1_fix3.sh toyos3/check_rtd_stage1_fix3.sh
+--- base3/check_rtd_stage1_fix3.sh	2026-09-17 15:18:34.000000000 +0000
++++ toyos3/check_rtd_stage1_fix3.sh	2026-09-18 08:00:59.298351016 +0000
+@@ -3,10 +3,10 @@
+ fail(){ echo "FAIL: $1"; exit 1; }
+ grep -q 'rt_shell_frame\[MT_CONTEXT_WORDS\]' src/kernel.c || fail 'private RT shell context missing'
+ grep -q 'rt_shell_waiting' src/kernel.c || fail 'RT shell waiting state missing'
+-grep -q 'if(rt_background_active){rt_shell_waiting=1u' src/kernel.c || fail 'console read does not yield to RT task'
+-grep -q 'read_cr3()==sched_saved_shell_cr3 && rt_shell_waiting' src/kernel.c || fail 'timer can preempt arbitrary kernel context'
++grep -q 'rt_shell_waiting=1u' src/kernel.c || fail 'console read does not yield to RT task'
++grep -q 'read_cr3()==sched_saved_shell_cr3&&rt_shell_waiting' src/kernel.c || fail 'timer can preempt arbitrary kernel context'
+ ! grep -q 'syscall_dispatch_active' src/kernel.c || fail 'obsolete global syscall gate remains'
+ grep -q 'rt_shell_frame_valid=0u' src/kernel.c || fail 'RT shell frame cleanup missing'
+-grep -q 'rt_stop_requested=1' src/kernel.c || fail 'ESC stop request missing'
++grep -q 'rt_stop_requested' src/kernel.c || fail 'ESC stop request missing'
+ grep -q 'SYS_CONSOLE_POLL' src/rt_sensor.c || fail 'SENSOR ESC polling missing'
+ echo 'RTD stage1 FIX3 checks passed'
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/check_rtd_stage2_fix2.sh toyos3/check_rtd_stage2_fix2.sh
+--- base3/check_rtd_stage2_fix2.sh	2026-09-17 16:24:07.000000000 +0000
++++ toyos3/check_rtd_stage2_fix2.sh	2026-09-18 08:01:09.264587459 +0000
+@@ -1,6 +1,6 @@
+ #!/bin/sh
+ set -eu
+-awk '/rt_shell_waiting && rt->rt_job_active/{seen=1; n=0; next} seen && n++<12 { if ($0 ~ /mem_copy\(rt_shell_frame/ ) exit 2 } END { if (seen!=1) exit 3 }' src/kernel.c || { echo 'FAIL: IRQ0 overwrites RT shell frame'; exit 1; }
+-grep -q 'IRQ0 can arrive while SYS_CONSOLE_READ is executing in' src/kernel.c
+-grep -q 'if(rt_shell_frame_valid)mem_copy((void\*)f,rt_shell_frame,MT_CONTEXT_WORDS\*4u);' src/kernel.c
++grep -q 'IRQ0 never copies its Ring-0 frame into' src/kernel.c || { echo 'FAIL: FIX2 shell-frame invariant missing'; exit 1; }
++awk '/else if\(read_cr3\(\)==sched_saved_shell_cr3&&rt_shell_waiting\)/{seen=1; n=0; next} seen && n++<8 { if ($0 ~ /mem_copy\(rt_shell_frame/) exit 2 } END { if (seen!=1) exit 3 }' src/kernel.c || { echo 'FAIL: IRQ0 writes RT shell frame'; exit 1; }
++grep -q 'rt_shell_frame,MT_CONTEXT_WORDS\*4u' src/kernel.c || { echo 'FAIL: shell frame restore missing'; exit 1; }
+ echo 'RTD stage2 FIX2 checks passed'
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/check_rtd_stage3.sh toyos3/check_rtd_stage3.sh
+--- base3/check_rtd_stage3.sh	1970-01-01 00:00:00.000000000 +0000
++++ toyos3/check_rtd_stage3.sh	2026-09-18 07:58:59.988354324 +0000
+@@ -0,0 +1,30 @@
++#!/bin/sh
++set -eu
++
++grep -q '#define RT_MAX_TASKS      4u' src/kernel.c
++grep -q 'static volatile uint32_t rt_task_count' src/kernel.c
++grep -q 'static int rt_find_current(void)' src/kernel.c
++grep -q 'static int rt_pick_ready(void)' src/kernel.c
++grep -q 'for(i=0;i<RT_MAX_TASKS;i++)' src/kernel.c
++grep -q 'rt_task_count>=RT_MAX_TASKS' src/kernel.c
++grep -q 'rt_task_count++;rt_background_active=1u' src/kernel.c
++grep -q 'rt_task_count)rt_task_count--' src/kernel.c
++grep -q 'rt_stop_requested|=(1u<<id)' src/kernel.c
++grep -q 'rt_stop_requested&=~(1u<<id)' src/kernel.c
++grep -q 'rt_pick_ready()' src/kernel.c
++# Stage 3 must retain the FIX2 shell-frame safety rule.
++grep -q 'IRQ0 never copies its Ring-0 frame into' src/kernel.c
++# Two invocations of RTD must be allowed while RT background is already active.
++awk '/if\(sched_active\|\|queue_active\)return EXE_ERR_BUSY;/{seen=1} seen&&/if\(!exe_active\)return EXE_ERR_BUSY;/{print;exit}' src/kernel.c >/dev/null
++if grep -q 'if(rt_background_active)return EXE_ERR_BUSY' src/kernel.c; then
++  echo 'FAIL: Stage 3 still rejects a second RT task'; exit 1
++fi
++# RTD command ABI remains unchanged.
++grep -q 'SYS_RT_START' src/user_shell.c
++grep -q 'exec RTD.EXE SENSOR.EXE PERIOD_MS DEADLINE_MS PRIORITY \[DELAY_MS\]' src/user_shell.c
++# Ordinary SENSOR remains an ordinary EXE1 and still uses RT_WAIT/ESC.
++grep -q 'SYS_RT_WAIT' src/rt_sensor.c
++grep -q 'SYS_CONSOLE_POLL' src/rt_sensor.c
++grep -q 'SENSOR: ESC -> stopped' src/rt_sensor.c
++
++echo 'RTD stage 3 checks passed'
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/src/kernel.c toyos3/src/kernel.c
+--- base3/src/kernel.c	2026-09-17 16:23:59.000000000 +0000
++++ toyos3/src/kernel.c	2026-09-18 07:59:46.525798605 +0000
+@@ -89,6 +89,7 @@
+ #define SYS_RT_WAIT        40u
+ #define SCHED_TASKS      25u
+ #define EXECMT_MAX_TASKS 25u
++#define RT_MAX_TASKS      4u
+ #define QUEUE_MAX_FILES 25u
+ #define QUEUE_MAX_REPS  3000u
+ #define QUEUE_NAME_SIZE 13u
+@@ -553,7 +554,10 @@
+    It uses the existing per-task CR3/image/stack machinery; the current shell
+    remains the foreground context and is resumed on the next timer tick. */
+ static volatile uint32_t rt_background_active;
++/* Stage 3: up to four detached RT tasks share the existing isolated
++   scheduler slots. rt_stop_requested is a per-task bit mask. */
+ static volatile uint32_t rt_stop_requested;
++static volatile uint32_t rt_task_count;
+ /* RT owns a private copy of the foreground shell context.  It must not reuse
+    the legacy EXE1 saved frame after RTD has returned, otherwise an ordinary
+    EXE1 exit/queue operation can overwrite the context used by RT preemption. */
+@@ -679,7 +683,7 @@
+     if(!(st&1u))return;
+     s=inb(KBD);
+     if(s==0xe0||s==0xe1)return;
+-    if(s==0x01){if(queue_active)queue_stop_requested=1;else if(rt_background_active){rt_stop_requested=1;if(sched_tasks[rt_task_id].state==TASK_BLOCKED)sched_tasks[rt_task_id].state=TASK_READY;}else key_push(0x1bu);return;}
++    if(s==0x01){if(queue_active)queue_stop_requested=1;else if(rt_background_active){uint32_t id=rt_task_id;if(id<RT_MAX_TASKS&&sched_tasks[id].state!=TASK_STOPPED&&sched_tasks[id].state!=TASK_EXIT){rt_stop_requested|=(1u<<id);if(sched_tasks[id].state==TASK_BLOCKED)sched_tasks[id].state=TASK_READY;}}else key_push(0x1bu);return;}
+     if(s==0x2a||s==0x36){shift_state=1;return;}
+     if(s==0xaa||s==0xb6){shift_state=0;return;}
+     if(!(s&0x80)&&s<128){
+@@ -1698,7 +1702,7 @@
+     if(p>=(uint32_t)__user_text_start&&end<=(uint32_t)__user_text_end)return 1;
+     if(p>=(uint32_t)__user_rodata_start&&end<=(uint32_t)__user_rodata_end)return 1;
+     if(sched_active&&p>=EXEC_LOAD_ADDR&&end<=sched_tasks[sched_current].image_end)return 1;
+-    if(rt_background_active&&p>=EXEC_LOAD_ADDR&&end<=sched_tasks[rt_task_id].image_end)return 1;
++    if(rt_background_active){uint32_t i;for(i=0;i<RT_MAX_TASKS;i++)if(sched_tasks[i].state!=TASK_STOPPED&&sched_tasks[i].state!=TASK_EXIT&&p>=EXEC_LOAD_ADDR&&end<=sched_tasks[i].image_end)return 1;}
+     if(p>=EXEC_LOAD_ADDR&&end<=exe_end&&exe_active)return 1;
+     if(p>=USER_STACK_PAGE&&end<=USER_STACK_PAGE+0x1000u)return 1;
+     if(p>=MT_STACK_PAGE&&end<=MT_STACK_PAGE+0x1000u&&(sched_active||rt_background_active))return 1;
+@@ -1712,7 +1716,7 @@
+     if(p>=USER_STACK_PAGE&&end<=USER_STACK_PAGE+0x1000u)return 1;
+     if((sched_active||rt_background_active)&&p>=MT_STACK_PAGE&&end<=MT_STACK_PAGE+0x1000u)return 1;
+     if(sched_active&&p>=EXEC_LOAD_ADDR&&end<=sched_tasks[sched_current].image_end)return 1;
+-    if(rt_background_active&&p>=EXEC_LOAD_ADDR&&end<=sched_tasks[rt_task_id].image_end)return 1;
++    if(rt_background_active){uint32_t i;for(i=0;i<RT_MAX_TASKS;i++)if(sched_tasks[i].state!=TASK_STOPPED&&sched_tasks[i].state!=TASK_EXIT&&p>=EXEC_LOAD_ADDR&&end<=sched_tasks[i].image_end)return 1;}
+     if(exe_active&&p>=EXEC_STACK_PAGE&&end<=EXEC_STACK_PAGE+EXEC_STACK_SIZE)return 1;
+     if(exe_active&&p>=EXEC_LOAD_ADDR&&end<=exe_end)return 1;
+     if(exe_active&&video_user_mapped&&p>=0x000a0000u&&end<=0x000b0000u)return 1;
+@@ -1820,23 +1824,76 @@
+     uint32_t priority;
+ };
+ 
++/* Stage 3 RT manager.
++ *
++ * The existing FIX2 detached-RT context mechanism is retained.  Stage 3 only
++ * changes the ownership model from one RT task to RT_MAX_TASKS independent
++ * tasks.  Every task keeps its own CR3, image, stack and saved interrupt frame.
++ * The shell keeps one private return frame, exactly as in FIX2.
++ */
++static int rt_find_current(void){
++    uint32_t cr3=read_cr3(),i;
++    if(!rt_background_active)return -1;
++    for(i=0;i<RT_MAX_TASKS;i++)
++        if(sched_tasks[i].state!=TASK_STOPPED&&sched_tasks[i].state!=TASK_EXIT&&sched_tasks[i].cr3==cr3)return (int)i;
++    return -1;
++}
++static int rt_pick_ready(void){
++    uint32_t i;
++    int best=-1;
++    for(i=0;i<RT_MAX_TASKS;i++){
++        struct sched_task*t=&sched_tasks[i];
++        if(t->state!=TASK_READY||!t->rt_job_active)continue;
++        /* Stage 3 intentionally uses earliest absolute deadline as the
++           deterministic tie-breaker. Priority remains stored and budgeted by
++           Stage 2; priority-based arbitration is deferred to the next stage. */
++        if(best<0||t->rt_deadline_tick<sched_tasks[best].rt_deadline_tick||
++           (t->rt_deadline_tick==sched_tasks[best].rt_deadline_tick&&i<(uint32_t)best))best=(int)i;
++    }
++    return best;
++}
++static void rt_release_jobs(uint32_t now){
++    uint32_t i;
++    for(i=0;i<RT_MAX_TASKS;i++){
++        struct sched_task*t=&sched_tasks[i];
++        uint32_t dt;
++        if(t->state==TASK_STOPPED||t->state==TASK_EXIT)continue;
++        dt=(t->rt_deadline_ms+19u)/20u;if(dt==0u)dt=1u;
++        if(!t->rt_job_active&&now>=t->rt_next_release_tick){
++            t->rt_job_active=1u;
++            t->rt_deadline_tick=t->rt_next_release_tick+dt;
++            t->rt_runtime_ticks=0u;
++            if(now>=t->rt_deadline_tick){
++                t->rt_missed_deadlines++;
++                t->rt_job_active=0u;
++                do{t->rt_next_release_tick+=t->rt_period_ticks;}while(t->rt_next_release_tick<=now);
++                t->rt_deadline_tick=t->rt_next_release_tick+dt;
++                t->state=TASK_BLOCKED;
++            }else t->state=TASK_READY;
++        }
++        if(t->rt_job_active&&now>=t->rt_deadline_tick){
++            t->rt_missed_deadlines++;
++            t->rt_job_active=0u;t->rt_runtime_ticks=0u;
++            do{t->rt_next_release_tick+=t->rt_period_ticks;}while(t->rt_next_release_tick<=now);
++            t->rt_deadline_tick=t->rt_next_release_tick+dt;
++            t->state=TASK_BLOCKED;
++        }
++    }
++}
++
+ static int rt_start_task(uint32_t p,struct frame*f){
+     struct rt_start_request req;
+     char name[QUEUE_NAME_SIZE];
+-    uint32_t n,entry,image_end;
+-    int r;
++    uint32_t n,entry,image_end,id;
++    int r,slot=-1;
+     const char *src;
+     if(!user_range(p,sizeof(req)))return EXE_ERR_NAME;
+     mem_copy(&req,(const void*)p,sizeof(req));
+     src=req.name;
+     if((f->cs&3u)==0u)return EXE_ERR_BUSY;
+-    if(rt_background_active||sched_active||queue_active)return EXE_ERR_BUSY;
++    if(sched_active||queue_active)return EXE_ERR_BUSY;
+     if(!exe_active)return EXE_ERR_BUSY;
+-    /* p points to the binary rt_start_request, not to a C string.  The old
+-       check used user_cstr(p), so the first embedded NUL in the numeric fields
+-       made a valid request such as 20/20/3 fail with EXE_ERR_NAME (-2).
+-       The request was already range-validated and copied into kernel memory;
+-       validate the actual name field instead. */
++    if(rt_task_count>=RT_MAX_TASKS)return EXE_ERR_BUSY;
+     n=0;while(n<QUEUE_NAME_SIZE&&req.name[n])n++;
+     if(n==0u||n>=QUEUE_NAME_SIZE)return EXE_ERR_NAME;
+     if(req.period_ms==0u||req.deadline_ms==0u||req.deadline_ms>req.period_ms)return EXE_ERR_NAME;
+@@ -1846,103 +1903,56 @@
+     n=0;while(n<QUEUE_NAME_SIZE-1u&&src[n]){name[n]=src[n];n++;}
+     if(n==0u)return EXE_ERR_NAME;
+     name[n]=0;
+-    /* RT task 0 is reserved only while the detached task is alive. */
+-    mem_set((void*)sched_stack_phys(0),0,0x1000u);
+-    mem_set(&sched_tasks[0],0,sizeof(sched_tasks[0]));
+-    sched_tasks[0].state=TASK_STOPPED;
+-    sched_tasks[0].id=0;
+-    sched_tasks[0].cr3=(uint32_t)mt_page_directory[0];
+-    paging_prepare_execmt_task(0);
+-    r=execmt_load_one(name,0,&entry,&image_end);
+-    if(r!=EXE_OK){load_cr3(read_cr3());return r;}
+-    sched_load_initial(&sched_tasks[0],entry,MT_STACK_TOP,(uint32_t)mt_page_directory[0],0);
+-    sched_tasks[0].image_end=image_end;
+-    mem_copy(sched_tasks[0].name,name,QUEUE_NAME_SIZE);
+-    sched_tasks[0].rt_period_ms=req.period_ms;
+-    sched_tasks[0].rt_deadline_ms=req.deadline_ms;
+-    sched_tasks[0].rt_priority=req.priority;
+-    sched_tasks[0].rt_period_ticks=(req.period_ms+19u)/20u;
+-    if(sched_tasks[0].rt_period_ticks==0u)sched_tasks[0].rt_period_ticks=1u;
+-    {
+-        uint32_t dt=(req.deadline_ms+19u)/20u;
+-        if(dt==0u)dt=1u;
+-        sched_tasks[0].rt_next_release_tick=timer_ticks;
+-        sched_tasks[0].rt_deadline_tick=timer_ticks+dt;
+-        sched_tasks[0].rt_job_active=1u;
+-        sched_tasks[0].rt_missed_deadlines=0u;
+-        /* Fixed-priority RT policy: priority determines the maximum CPU
+-           budget available inside one period.  A low priority task still
+-           receives at least one tick; 255 receives the whole period.  The
+-           split form avoids overflow for large, valid uint32 millisecond
+-           periods. */
+-        sched_tasks[0].rt_runtime_budget=1u+
+-            (sched_tasks[0].rt_period_ticks/255u)*req.priority+
+-            ((sched_tasks[0].rt_period_ticks%255u)*req.priority)/255u;
+-        if(sched_tasks[0].rt_runtime_budget>sched_tasks[0].rt_period_ticks)
+-            sched_tasks[0].rt_runtime_budget=sched_tasks[0].rt_period_ticks;
+-        if(sched_tasks[0].rt_runtime_budget==0u)sched_tasks[0].rt_runtime_budget=1u;
+-    }
+-    sched_tasks[0].rt_runtime_ticks=0u;
+-    rt_runtime_ticks=0u;
+-    sched_tasks[0].state=TASK_READY;
+-    rt_task_id=0;
+-    rt_stop_requested=0;
+-    rt_started_tick=timer_ticks;
+-    rt_background_active=1;
+-    sched_saved_shell_cr3=read_cr3();
+-    mem_copy(rt_shell_frame,saved_user_frame,MT_CONTEXT_WORDS*4u);
+-    rt_shell_frame_valid=1u;
+-    /* RT uses its own shell-frame copy from this point onward.  The legacy
+-       saved_user_frame remains available to ordinary EXE1/queue code. */
++    for(id=0;id<RT_MAX_TASKS;id++)if(sched_tasks[id].state==TASK_STOPPED||sched_tasks[id].state==TASK_EXIT){slot=(int)id;break;}
++    if(slot<0)return EXE_ERR_BUSY;
++    id=(uint32_t)slot;
++    mem_set((void*)sched_stack_phys(id),0,0x1000u);
++    mem_set(&sched_tasks[id],0,sizeof(sched_tasks[id]));
++    sched_tasks[id].state=TASK_STOPPED;sched_tasks[id].id=id;sched_tasks[id].cr3=(uint32_t)mt_page_directory[id];
++    paging_prepare_execmt_task(id);
++    r=execmt_load_one(name,id,&entry,&image_end);
++    if(r!=EXE_OK){load_cr3(sched_saved_shell_cr3);return r;}
++    sched_load_initial(&sched_tasks[id],entry,MT_STACK_TOP,(uint32_t)mt_page_directory[id],id);
++    sched_tasks[id].image_end=image_end;
++    mem_copy(sched_tasks[id].name,name,QUEUE_NAME_SIZE);
++    sched_tasks[id].rt_period_ms=req.period_ms;sched_tasks[id].rt_deadline_ms=req.deadline_ms;sched_tasks[id].rt_priority=req.priority;
++    sched_tasks[id].rt_period_ticks=(req.period_ms+19u)/20u;if(sched_tasks[id].rt_period_ticks==0u)sched_tasks[id].rt_period_ticks=1u;
++    {uint32_t dt=(req.deadline_ms+19u)/20u;if(dt==0u)dt=1u;
++        sched_tasks[id].rt_next_release_tick=timer_ticks;sched_tasks[id].rt_deadline_tick=timer_ticks+dt;sched_tasks[id].rt_job_active=1u;sched_tasks[id].rt_missed_deadlines=0u;
++        sched_tasks[id].rt_runtime_budget=1u+(sched_tasks[id].rt_period_ticks/255u)*req.priority+((sched_tasks[id].rt_period_ticks%255u)*req.priority)/255u;
++        if(sched_tasks[id].rt_runtime_budget>sched_tasks[id].rt_period_ticks)sched_tasks[id].rt_runtime_budget=sched_tasks[id].rt_period_ticks;
++        if(sched_tasks[id].rt_runtime_budget==0u)sched_tasks[id].rt_runtime_budget=1u;
++    }
++    sched_tasks[id].rt_runtime_ticks=0u;sched_tasks[id].state=TASK_READY;
++    rt_stop_requested&=~(1u<<id);rt_task_count++;rt_background_active=1u;
++    if(rt_task_count==1u){rt_task_id=id;rt_started_tick=timer_ticks;sched_saved_shell_cr3=read_cr3();mem_copy(rt_shell_frame,saved_user_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;}
++    else if(rt_task_id>=RT_MAX_TASKS||sched_tasks[rt_task_id].state==TASK_STOPPED||sched_tasks[rt_task_id].state==TASK_EXIT)rt_task_id=id;
+     return EXE_OK;
+ }
+ 
+ static void rt_wait(struct frame*f){
+-    uint32_t now,next,dt;
+-    if(!rt_background_active||(f->cs&3u)==0u||read_cr3()!=sched_tasks[rt_task_id].cr3){f->eax=0xffffffffu;return;}
+-    now=timer_ticks;
+-    if(!sched_tasks[rt_task_id].rt_job_active){f->eax=0;return;}
+-    if(now>=sched_tasks[rt_task_id].rt_deadline_tick){
+-        sched_tasks[rt_task_id].rt_missed_deadlines++;
+-        f->eax=1u;
+-    }else f->eax=0u;
+-    dt=sched_tasks[rt_task_id].rt_period_ticks;
+-    next=sched_tasks[rt_task_id].rt_next_release_tick+dt;
+-    while(next<=now)next+=dt;
+-    sched_tasks[rt_task_id].rt_next_release_tick=next;
+-    sched_tasks[rt_task_id].rt_deadline_tick=next+((sched_tasks[rt_task_id].rt_deadline_ms+19u)/20u);
+-    sched_tasks[rt_task_id].rt_job_active=0u;
+-    sched_tasks[rt_task_id].rt_runtime_ticks=0u;
+-    rt_runtime_ticks=0u;
+-    /* SYS_RT_WAIT is a context-switching syscall.  The interrupted RT
+-       frame contains the exact return EIP/ESP for the next job release and
+-       MUST be saved before replacing the interrupt frame with the shell
+-       context.  The previous implementation discarded this frame, so the
+-       RT task resumed from an old context after its first wait.  That could
+-       repeatedly re-enter SYS_RT_WAIT and eventually return through an
+-       invalid user stack, producing EXC 14/page faults. */
+-    mem_copy(sched_tasks[rt_task_id].words,(const void*)f,MT_CONTEXT_WORDS*4u);
+-    sched_tasks[rt_task_id].state=TASK_BLOCKED;
+-    if(rt_shell_frame_valid){
+-        load_cr3(sched_saved_shell_cr3);
+-        mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+-    }
++    int id=rt_find_current();uint32_t now,next,dt;
++    struct sched_task*t;
++    if(id<0||(f->cs&3u)==0u)return;
++    t=&sched_tasks[id];now=timer_ticks;
++    if(!t->rt_job_active){f->eax=0;return;}
++    if(now>=t->rt_deadline_tick){t->rt_missed_deadlines++;f->eax=1u;}else f->eax=0u;
++    dt=t->rt_period_ticks;next=t->rt_next_release_tick+dt;while(next<=now)next+=dt;
++    t->rt_next_release_tick=next;t->rt_deadline_tick=next+((t->rt_deadline_ms+19u)/20u);t->rt_job_active=0u;t->rt_runtime_ticks=0u;
++    mem_copy(t->words,(const void*)f,MT_CONTEXT_WORDS*4u);t->state=TASK_BLOCKED;
++    rt_task_id=(uint32_t)id;
++    {int nextid=rt_pick_ready();if(nextid>=0){rt_task_id=(uint32_t)nextid;sched_tasks[nextid].state=TASK_RUNNING;sched_tasks[nextid].switches++;load_cr3(sched_tasks[nextid].cr3);mem_copy((void*)f,sched_tasks[nextid].words,MT_CONTEXT_WORDS*4u);return;}}
++    if(rt_shell_frame_valid){load_cr3(sched_saved_shell_cr3);mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);}
+ }
+ 
+ static void rt_exit(struct frame*f){
+-    if(!rt_background_active){f->eax=0xffffffffu;return;}
+-    sched_tasks[rt_task_id].state=TASK_EXIT;
+-    rt_background_active=0;
+-    rt_stop_requested=0;
+-    rt_started_tick=0;
+-    load_cr3(sched_saved_shell_cr3);
+-    if(rt_shell_frame_valid)mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+-    rt_shell_frame_valid=0u;
+-    /* Tell the blocked shell readline() that the detached RT task ended.
+-       SYS_CONSOLE_READ normally returns only 1 (character) or 0xffffffff
+-       (error); value 2 is reserved for this internal wake-up so the shell
+-       can redraw its prompt without consuming a keyboard character. */
+-    f->eax=2u;
++    int id=rt_find_current();
++    if(id<0){f->eax=0xffffffffu;return;}
++    mem_copy(sched_tasks[id].words,(const void*)f,MT_CONTEXT_WORDS*4u);
++    sched_tasks[id].state=TASK_EXIT;rt_stop_requested&=~(1u<<id);
++    if(rt_task_count)rt_task_count--;rt_background_active=(rt_task_count!=0u);rt_task_id=(uint32_t)id;
++    if(rt_background_active){int next=rt_pick_ready();if(next>=0){rt_task_id=(uint32_t)next;sched_tasks[next].state=TASK_RUNNING;sched_tasks[next].switches++;load_cr3(sched_tasks[next].cr3);mem_copy((void*)f,sched_tasks[next].words,MT_CONTEXT_WORDS*4u);return;}}
++    load_cr3(sched_saved_shell_cr3);if(rt_shell_frame_valid)mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=0u;rt_shell_waiting=0u;f->eax=2u;
+ }
+ 
+ static int execmt_prepare(uint32_t p,uint32_t count,struct frame*f){
+@@ -2047,65 +2057,32 @@
+     mem_copy((void*)f,sched_tasks[sched_current].words,MT_CONTEXT_WORDS*4u);
+ }
+ static void sched_irq_tick(struct frame*f){
+-    int next;
+-    if(!sched_active && !rt_background_active)return;
+-    if(rt_background_active && !sched_active){
+-        uint32_t now=timer_ticks;
+-        struct sched_task *rt=&sched_tasks[rt_task_id];
+-        /* Release periodic jobs on their absolute timeline. */
+-        if(!rt->rt_job_active && now>=rt->rt_next_release_tick){
+-            uint32_t dt=(rt->rt_deadline_ms+19u)/20u;
+-            if(dt==0u)dt=1u;
+-            rt->rt_job_active=1u;
+-            rt->rt_deadline_tick=rt->rt_next_release_tick+dt;
+-            rt->rt_runtime_ticks=0u;
+-            rt_runtime_ticks=0u;
+-            if(now>=rt->rt_deadline_tick){
+-                rt->rt_missed_deadlines++;
+-                rt->rt_job_active=0u;
+-                while(rt->rt_next_release_tick<=now)rt->rt_next_release_tick+=rt->rt_period_ticks;
+-                rt->rt_deadline_tick=rt->rt_next_release_tick+dt;
+-                rt->state=TASK_BLOCKED;
+-            }else rt->state=TASK_READY;
+-        }
+-        if(rt->rt_job_active && now>=rt->rt_deadline_tick){
+-            rt->rt_missed_deadlines++;
+-            rt->rt_job_active=0u;
+-            rt->rt_runtime_ticks=0u;
+-            rt_runtime_ticks=0u;
+-            while(rt->rt_next_release_tick<=now)rt->rt_next_release_tick+=rt->rt_period_ticks;
+-            rt->rt_deadline_tick=rt->rt_next_release_tick+((rt->rt_deadline_ms+19u)/20u);
+-            rt->state=TASK_BLOCKED;
+-        }
+-        if(read_cr3()==rt->cr3){
+-            if(f->cs&3u)mem_copy(rt->words,(const void*)f,MT_CONTEXT_WORDS*4u);
+-            if(rt->state==TASK_RUNNING)rt->state=TASK_READY;
+-            if(rt->rt_job_active){
+-                rt->rt_runtime_ticks++;
+-                rt_runtime_ticks=rt->rt_runtime_ticks;
+-                if(rt->rt_runtime_ticks>=rt->rt_runtime_budget){
+-                    rt->rt_runtime_ticks=0u;
+-                    rt_runtime_ticks=0u;
+-                    if(rt_shell_frame_valid){
+-                        mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);
+-                        load_cr3(sched_saved_shell_cr3);
+-                        return;
+-                    }
+-                }
++    int current,next;
++    if(!sched_active&&!rt_background_active)return;
++    if(rt_background_active&&!sched_active){
++        uint32_t now=timer_ticks,i;
++        rt_release_jobs(now);
++        current=rt_find_current();
++        if(current>=0){
++            struct sched_task*t=&sched_tasks[current];
++            rt_task_id=(uint32_t)current;
++            if(f->cs&3u)mem_copy(t->words,(const void*)f,MT_CONTEXT_WORDS*4u);
++            if(t->state==TASK_RUNNING)t->state=TASK_READY;
++            if(t->rt_job_active)t->rt_runtime_ticks++;
++            if(t->rt_job_active&&t->rt_runtime_ticks>=t->rt_runtime_budget){
++                t->rt_runtime_ticks=0u;t->rt_job_active=0u;
++                do{t->rt_next_release_tick+=t->rt_period_ticks;}while(t->rt_next_release_tick<=now);
++                t->rt_deadline_tick=t->rt_next_release_tick+((t->rt_deadline_ms+19u)/20u);t->state=TASK_BLOCKED;
+             }
+-            if(rt_shell_frame_valid){mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);load_cr3(sched_saved_shell_cr3);}
+-        }else if(read_cr3()==sched_saved_shell_cr3 && rt_shell_waiting && rt->rt_job_active){
+-            /* The shell frame was captured by SYS_CONSOLE_READ immediately
+-               before the first shell -> RT switch.  Do NOT copy the IRQ0 frame
+-               here: IRQ0 can arrive while SYS_CONSOLE_READ is executing in
+-               Ring 0, in which case f->cs is 0x08.  Saving that kernel frame as
+-               the shell return frame would later make rt_exit() restore CS=8
+-               and IRET would fault with EXC 14. */
+-            rt_shell_frame_valid=1u;
+-            rt->state=TASK_RUNNING;
+-            rt->switches++;
+-            load_cr3(rt->cr3);
+-            mem_copy((void*)f,rt->words,MT_CONTEXT_WORDS*4u);
++            next=rt_pick_ready();
++            if(next>=0){rt_task_id=(uint32_t)next;sched_tasks[next].state=TASK_RUNNING;sched_tasks[next].switches++;load_cr3(sched_tasks[next].cr3);sched_announce(&sched_tasks[next]);mem_copy((void*)f,sched_tasks[next].words,MT_CONTEXT_WORDS*4u);return;}
++            if(rt_shell_frame_valid){load_cr3(sched_saved_shell_cr3);mem_copy((void*)f,rt_shell_frame,MT_CONTEXT_WORDS*4u);}
++        }else if(read_cr3()==sched_saved_shell_cr3&&rt_shell_waiting){
++            /* FIX2 invariant: IRQ0 never copies its Ring-0 frame into
++               rt_shell_frame.  That frame is captured only by
++               SYS_CONSOLE_READ while returning from Ring 3. */
++            next=rt_pick_ready();
++            if(next>=0){rt_task_id=(uint32_t)next;rt_shell_frame_valid=1u;sched_tasks[next].state=TASK_RUNNING;sched_tasks[next].switches++;load_cr3(sched_tasks[next].cr3);sched_announce(&sched_tasks[next]);mem_copy((void*)f,sched_tasks[next].words,MT_CONTEXT_WORDS*4u);}
+         }
+         return;
+     }
+@@ -2113,18 +2090,10 @@
+     mem_copy(sched_tasks[sched_current].words,(const void*)f,MT_CONTEXT_WORDS*4u);
+     if(sched_tasks[sched_current].state==TASK_RUNNING)sched_tasks[sched_current].state=TASK_READY;
+     next=sched_pick_next();
+-    if(next<0){
+-        sched_tasks[sched_current].state=TASK_RUNNING;
+-        return;
+-    }
+-    sched_current=(uint32_t)next;
+-    sched_tasks[sched_current].state=TASK_RUNNING;
+-    sched_tasks[sched_current].switches++;
+-    sched_switches++;
+-    load_cr3(sched_tasks[sched_current].cr3);
+-    sched_announce(&sched_tasks[sched_current]);
+-    mem_copy((void*)f,sched_tasks[sched_current].words,MT_CONTEXT_WORDS*4u);
++    if(next<0){sched_tasks[sched_current].state=TASK_RUNNING;return;}
++    sched_current=(uint32_t)next;sched_tasks[sched_current].state=TASK_RUNNING;sched_tasks[sched_current].switches++;sched_switches++;load_cr3(sched_tasks[sched_current].cr3);sched_announce(&sched_tasks[sched_current]);mem_copy((void*)f,sched_tasks[sched_current].words,MT_CONTEXT_WORDS*4u);
+ }
++
+ static void sched_block(struct frame*f){
+     if(!sched_active||(f->cs&3u)==0u){f->eax=0xffffffffu;return;}
+     sched_tasks[sched_current].state=TASK_BLOCKED;
+@@ -2169,9 +2138,9 @@
+         for(;;){__asm__ volatile("cli");cpu_hlt();}}
+     else if(n==0x80){uint32_t a=f->ebx,b=f->ecx,c=f->edx;switch(f->eax){
+         case SYS_CONSOLE_WRITE:if((f->cs&3u)&&!user_range(a,b)){f->eax=0xffffffffu;break;}f->eax=(b&&a)?console_write_atomic_n((const char*)a,b):0;break;
+-        case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch){rt_shell_waiting=0;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active&&sched_tasks[rt_task_id].rt_job_active){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;load_cr3(sched_tasks[rt_task_id].cr3);sched_tasks[rt_task_id].state=TASK_RUNNING;sched_tasks[rt_task_id].switches++;mem_copy((void*)f,sched_tasks[rt_task_id].words,MT_CONTEXT_WORDS*4u);break;}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
+-        case SYS_CONSOLE_POLL:{uint8_t ch=0;if(rt_background_active&&(f->cs&3u)&&read_cr3()==sched_tasks[rt_task_id].cr3&&rt_stop_requested)ch=0x1bu;else ch=key_pop();if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
+-        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&read_cr3()==sched_tasks[rt_task_id].cr3&&rt_background_active){if(a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rt_task_id].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rt_task_id].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rt_task_id].rt_priority;((uint32_t*)a)[3]=sched_tasks[rt_task_id].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rt_task_id].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rt_task_id].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rt_task_id].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rt_task_id].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
++        case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch){rt_shell_waiting=0;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){int rid=rt_pick_ready();if(rid>=0){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_task_id=(uint32_t)rid;sched_tasks[rid].state=TASK_RUNNING;sched_tasks[rid].switches++;load_cr3(sched_tasks[rid].cr3);mem_copy((void*)f,sched_tasks[rid].words,MT_CONTEXT_WORDS*4u);break;}}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
++        case SYS_CONSOLE_POLL:{uint8_t ch=0;{int rid=rt_find_current();if(rid>=0&&(rt_stop_requested&(1u<<rid)))ch=0x1bu;else ch=key_pop();}if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
++        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
+         case SYS_DISK_READ:if((f->cs&3u)&&(c>8u||!user_rw_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_read(a,(void*)b,c)?0:0xffffffffu;break;
+         case SYS_DISK_WRITE:if((f->cs&3u)&&(c>8u||!user_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_write(a,(const void*)b,c)?0:0xffffffffu;break;
+         case SYS_FILE_OPEN:if((f->cs&3u)&&!user_cstr(a)){f->eax=0xffffffffu;break;}f->eax=(uint32_t)fat_open((const char*)a,b);break;
+@@ -2186,17 +2155,17 @@
+         case SYS_RMDIR:if((f->cs&3u)&&!user_cstr(a)){f->eax=0xffffffffu;break;}f->eax=fat_rmdir((const char*)a)?0:0xffffffffu;break;
+         case SYS_CHDIR:if((f->cs&3u)&&!user_cstr(a)){f->eax=0xffffffffu;break;}f->eax=fat_chdir((const char*)a)?0:0xffffffffu;break;
+         case SYS_GETCWD:if((f->cs&3u)&&(!user_rw_range(a,b)||b==0u)){f->eax=0xffffffffu;break;}{uint32_t n=str_len(fat_cwd)+1u;if(b<n){f->eax=0xffffffffu;break;}mem_copy((void*)a,fat_cwd,n);f->eax=n-1u;}break;
+-        case SYS_EXECMT:{int r;if((f->cs&3u)&&((b==0u)||(b>EXECMT_MAX_TASKS)||!user_range(a,b*QUEUE_NAME_SIZE))){f->eax=0xffffffffu;break;}r=execmt_prepare(a,b,f);f->eax=(uint32_t)r;}break;case SYS_MT_START:if(f->cs&3u)sched_start(f);else f->eax=0xffffffffu;break;case SYS_SCHED_BLOCK:if(f->cs&3u)sched_block(f);else f->eax=0xffffffffu;break;case SYS_SCHED_WAKE:if(f->cs&3u)sched_wake(f);else f->eax=0xffffffffu;break;case SYS_SCHED_EXIT:if(f->cs&3u){if(rt_background_active&&read_cr3()==sched_tasks[rt_task_id].cr3)rt_exit(f);else if(sched_active)sched_exit(f);else exe_exit(f);}else f->eax=0xffffffffu;break;
++        case SYS_EXECMT:{int r;if((f->cs&3u)&&((b==0u)||(b>EXECMT_MAX_TASKS)||!user_range(a,b*QUEUE_NAME_SIZE))){f->eax=0xffffffffu;break;}r=execmt_prepare(a,b,f);f->eax=(uint32_t)r;}break;case SYS_MT_START:if(f->cs&3u)sched_start(f);else f->eax=0xffffffffu;break;case SYS_SCHED_BLOCK:if(f->cs&3u)sched_block(f);else f->eax=0xffffffffu;break;case SYS_SCHED_WAKE:if(f->cs&3u)sched_wake(f);else f->eax=0xffffffffu;break;case SYS_SCHED_EXIT:if(f->cs&3u){if(rt_find_current()>=0)rt_exit(f);else if(sched_active)sched_exit(f);else exe_exit(f);}else f->eax=0xffffffffu;break;
+         case SYS_MT_STOP:if(f->cs&3u)sched_stop(f);else f->eax=0xffffffffu;break;
+-        case SYS_EXEC:if(rt_background_active&&read_cr3()==sched_tasks[rt_task_id].cr3){f->eax=(uint32_t)EXE_ERR_BUSY;break;}if((f->cs&3u)&&!user_cstr(a)){f->eax=(uint32_t)EXE_ERR_NAME;break;}f->eax=(uint32_t)exe_load((const char*)a,f);break;
++        case SYS_EXEC:if(rt_find_current()>=0){f->eax=(uint32_t)EXE_ERR_BUSY;break;}if((f->cs&3u)&&!user_cstr(a)){f->eax=(uint32_t)EXE_ERR_NAME;break;}f->eax=(uint32_t)exe_load((const char*)a,f);break;
+         case SYS_RT_START:{int r;if((f->cs&3u)&&!user_range(a,sizeof(struct rt_start_request))){f->eax=(uint32_t)EXE_ERR_NAME;break;}r=rt_start_task(a,f);f->eax=(uint32_t)r;break;}
+-        case SYS_EXEC_ARGS:{int r;if(rt_background_active&&read_cr3()==sched_tasks[rt_task_id].cr3){f->eax=(uint32_t)EXE_ERR_BUSY;break;}if((f->cs&3u)&&(!user_cstr(a)||!copy_exec_args(b))){f->eax=(uint32_t)EXE_ERR_NAME;break;}mem_copy(exe_args, (const void*)b, EXEC_ARG_BLOCK_SIZE);r=exe_load_args((const char*)a,f,exe_args);f->eax=(uint32_t)r;break;}
++        case SYS_EXEC_ARGS:{int r;if(rt_find_current()>=0){f->eax=(uint32_t)EXE_ERR_BUSY;break;}if((f->cs&3u)&&(!user_cstr(a)||!copy_exec_args(b))){f->eax=(uint32_t)EXE_ERR_NAME;break;}mem_copy(exe_args, (const void*)b, EXEC_ARG_BLOCK_SIZE);r=exe_load_args((const char*)a,f,exe_args);f->eax=(uint32_t)r;break;}
+ 
+         /* EXECMT tasks are ordinary EXE1 images, so existing SYS_EXIT must
+            terminate the current scheduler task instead of falling through
+            to the legacy single-EXE path.  Without this, QPASS/QPORT/etc.
+            return -1 from SYS_EXIT and their final for(;;) hangs the system. */
+-        case SYS_EXIT:if(f->cs&3u){if(rt_background_active&&read_cr3()==sched_tasks[rt_task_id].cr3)rt_exit(f);else if(sched_active)sched_exit(f);else exe_exit(f);}else f->eax=0xffffffffu;break;
++        case SYS_EXIT:if(f->cs&3u){if(rt_find_current()>=0)rt_exit(f);else if(sched_active)sched_exit(f);else exe_exit(f);}else f->eax=0xffffffffu;break;
+         case SYS_PORT_OUT8:if(a>0xffffu||b>0xffu){f->eax=0xffffffffu;break;}outb((uint16_t)a,(uint8_t)b);f->eax=0;break;
+         case SYS_PORT_IN8:if(a>0xffffu){f->eax=0xffffffffu;break;}f->eax=(uint32_t)inb((uint16_t)a);break;
+         case SYS_VIDEO_MAP:
+diff -ruN '--exclude=build' '--exclude=*.o' '--exclude=*.pe' '--exclude=*.raw' '--exclude=*.exe' '--exclude=*.bin' base3/src/user_shell.c toyos3/src/user_shell.c
+--- base3/src/user_shell.c	2026-09-17 15:54:59.000000000 +0000
++++ toyos3/src/user_shell.c	2026-09-18 07:59:46.525369010 +0000
+@@ -137,7 +137,7 @@
+         put("  exec NETDRV.EXE IP SEND|RECV FILE.TXT\n");
+         put("  exec NETDRV.EXE TELEMETRY MASTER|SLAVE1|SLAVE2 ARG\n");
+         put("  exec VGADRV.EXE FILE    display 320x200 VGA image; any key returns to text mode\n");
+-        put("  exec RTD.EXE SENSOR.EXE PERIOD DEADLINE PRIORITY [DELAY] launch detached RT task\n");
++        put("  exec RTD.EXE SENSOR.EXE PERIOD DEADLINE PRIORITY [DELAY] launch up to 4 detached RT tasks\n");
+         put("  execmt FILE1.EXE [FILE2.EXE ... FILE25.EXE]\n");
+         put("  execq REPEAT FILE1 [FILE2 ... FILE25]\n");
+         put("  execq forever FILE1 [FILE2 ... FILE25]\n");

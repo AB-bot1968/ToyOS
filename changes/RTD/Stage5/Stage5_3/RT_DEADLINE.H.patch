@@ -1,0 +1,26 @@
+--- a/src/rt_deadline.h	2026-09-18 13:06:26.000000000 +0000
++++ b/src/rt_deadline.h	2026-09-18 13:56:04.937264801 +0000
+@@ -28,4 +28,23 @@
+     return release_tick+deadline_ticks;
+ }
+ 
++/* Stage 5.3: periodic jobs use a no-backlog release policy after SYS_RT_WAIT.
++   Given the next nominal release candidate and the current time, return the
++   first release that is not strictly in the past.  Releases skipped because
++   the previous job finished late are counted separately.  Equality is kept: a
++   job that finishes exactly at its next release may start the next job now. */
++static inline unsigned int rt_next_release_after(unsigned int candidate,
++                                                  unsigned int now,
++                                                  unsigned int period_ticks,
++                                                  unsigned int *skipped){
++    unsigned int delta,count;
++    if(skipped)*skipped=0u;
++    if(period_ticks==0u)return candidate;
++    if(!rt_deadline_before(candidate,now))return candidate;
++    delta=(unsigned int)(now-candidate);
++    count=(delta/period_ticks)+1u;
++    if(skipped)*skipped=count;
++    return candidate+count*period_ticks;
++}
++
+ #endif

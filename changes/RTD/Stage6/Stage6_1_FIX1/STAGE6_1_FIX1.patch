@@ -1,0 +1,9 @@
+--- a/src/kernel.c
++++ b/src/kernel.c
+@@
+ static void sched_irq_tick(struct frame*f){
+     int next;
+     if(!sched_active&&!rt_background_active)return;
+     if(rt_background_active&&!sched_active){
++        if((f->cs&3u)==0u)return;
+         uint32_t now=rt_time_ticks;

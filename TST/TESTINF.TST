@@ -1,0 +1,37 @@
+# FIX54 infrastructure-debt acceptance.
+PRINT FIX54 INFRASTRUCTURE TEST
+RUN mtstop ALL
+RUN rtstat stop
+RUN rtstat reset
+RUN hwwd disarm
+RUN safemode normal 0
+RUN safepolicy reset
+ASSERT MT_ACTIVE 0
+ASSERT RT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+RUN safemode safe 5401
+EXPECT SAFE_DENY_MT_START
+ASSERT MT_ACTIVE 0
+RUN safemode normal 0
+EXPECT RM_GUARDS
+RUN safemode normal 0
+RUN spawn HBEATOK.EXE
+ASSERT MT_ACTIVE 1
+RUN mtstop MT1
+WAIT LAST
+ASSERT LAST_REASON 4
+ASSERT LAST_STATUS 0
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+# FIX54A regression: stopping the final detached MT task must close the hidden
+# MT session so the very next EXECMT can start without an intervening reset.
+START MT 1
+ASSERT MT_ACTIVE 1
+RUN mtstop ALL
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+ASSERT SAFE_MODE 0
+ASSERT RT_ACTIVE 0
+ASSERT HWWD_ARMED 0
+ASSERT HEALTH_STATE 0
+PRINT FIX54 INFRASTRUCTURE TEST COMPLETE

@@ -1,0 +1,20 @@
+--- /tmp/toyos_fix2base/src/kernel.c	2026-09-18 14:46:02.000000000 +0000
++++ src/kernel.c	2026-09-18 15:06:03.479814221 +0000
+@@ -2201,8 +2201,16 @@
+            wrong EIP/ESP or return from a syscall twice.  Blocking syscalls
+            (SYS_CONSOLE_READ/SYS_RT_WAIT) perform their own safe user-context
+            dispatch, while user-mode IRQ0 remains preemptible. */
+-        if((f->cs&3u)==0u)return;
++        /* Stage 6.1 FIX3: an IRQ0 that arrived while the shell or an RT
++           task is inside Ring-0 still advances release/deadline state.  The
++           previous FIX1 guard correctly forbade a context switch from a
++           kernel frame, but returning before rt_release_jobs() stranded a
++           10-ms job in TASK_BLOCKED until some unrelated user-mode IRQ0. */
+         uint32_t now=rt_time_ticks;
++        if((f->cs&3u)==0u){
++            rt_release_jobs(now);
++            return;
++        }
+         int current;
+         rt_release_jobs(now);
+         current=rt_find_current();

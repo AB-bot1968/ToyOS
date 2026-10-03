@@ -1,0 +1,415 @@
+--- /tmp/toyos_fix_base/toyos_stage42/src/kernel.c	2026-09-18 12:12:45.000000000 +0000
++++ /tmp/toyos_fix/toyos_stage42/src/kernel.c	2026-09-18 12:25:31.966846529 +0000
+@@ -555,6 +555,7 @@
+     uint32_t rt_deadline_tick;
+     uint32_t rt_job_release_tick;
+     uint32_t rt_job_active;
++    uint32_t rt_job_missed;
+     uint32_t rt_missed_deadlines;
+     uint32_t rt_runtime_ticks;
+     uint32_t rt_runtime_budget;
+@@ -1865,6 +1866,7 @@
+     t->rt_job_release_tick=release_tick;
+     t->rt_deadline_tick=rt_deadline_absolute(release_tick,dt);
+     t->rt_job_active=1u;
++    t->rt_job_missed=0u;
+     t->rt_runtime_ticks=0u;
+ }
+ static void rt_advance_release(struct sched_task*t,uint32_t now){
+@@ -1920,12 +1922,15 @@
+             }else t->state=TASK_READY;
+         }
+         if(t->rt_job_active&&rt_deadline_reached(now,t->rt_deadline_tick)){
+-            t->rt_missed_deadlines++;
+-            t->rt_job_active=0u;
+-            t->rt_runtime_ticks=0u;
+-            rt_advance_release(t,now);
+-            t->rt_deadline_tick=rt_deadline_absolute(t->rt_next_release_tick,rt_deadline_ms_to_ticks(t->rt_deadline_ms));
+-            t->state=TASK_BLOCKED;
++            /* Stage 5.1: reaching the absolute deadline does not change the
++               identity of the current job. Keep release/deadline immutable
++               until the application completes the job with SYS_RT_WAIT; only
++               record the miss. Deadline enforcement is deliberately deferred
++               to a later stage. */
++            if(!t->rt_job_missed){
++                t->rt_job_missed=1u;
++                t->rt_missed_deadlines++;
++            }
+         }
+     }
+ }
+@@ -1973,6 +1978,7 @@
+     sched_tasks[id].rt_job_release_tick=timer_ticks;
+     sched_tasks[id].rt_deadline_tick=rt_deadline_absolute(timer_ticks,rt_deadline_ms_to_ticks(req.deadline_ms));
+     sched_tasks[id].rt_job_active=1u;
++    sched_tasks[id].rt_job_missed=0u;
+     sched_tasks[id].rt_missed_deadlines=0u;
+     sched_tasks[id].rt_runtime_budget=1u+
+         (sched_tasks[id].rt_period_ticks/255u)*req.priority+
+@@ -2015,10 +2021,13 @@
+     if(id<0||(f->cs&3u)==0u){f->eax=0xffffffffu;return;}
+     t=&sched_tasks[id];now=timer_ticks;
+     if(!t->rt_job_active){f->eax=0;return;}
+-    if(rt_deadline_reached(now,t->rt_deadline_tick)){t->rt_missed_deadlines++;f->eax=1u;}else f->eax=0u;
++    if(t->rt_job_missed||rt_deadline_reached(now,t->rt_deadline_tick)){
++        if(!t->rt_job_missed)t->rt_missed_deadlines++;
++        f->eax=1u;
++    }else f->eax=0u;
+     dt=t->rt_period_ticks;next=t->rt_next_release_tick+dt;while(rt_deadline_reached(now,next))next+=dt;
+     t->rt_next_release_tick=next;t->rt_deadline_tick=rt_deadline_absolute(next,rt_deadline_ms_to_ticks(t->rt_deadline_ms));
+-    t->rt_job_active=0u;t->rt_runtime_ticks=0u;
++    t->rt_job_active=0u;t->rt_job_missed=0u;t->rt_runtime_ticks=0u;
+     mem_copy(t->words,(const void*)f,MT_CONTEXT_WORDS*4u);t->state=TASK_BLOCKED;
+     {int nextid=rt_pick_ready();if(nextid>=0){rt_switch_to(f,nextid);return;}}
+     rt_switch_to_shell(f);
+--- /tmp/toyos_fix_base/toyos_stage42/src/rt_deadline_diag.c	2026-09-18 12:10:35.000000000 +0000
++++ /tmp/toyos_fix/toyos_stage42/src/rt_deadline_diag.c	2026-09-18 12:25:59.472275186 +0000
+@@ -20,12 +20,12 @@
+     uint32_t info[5],now,release,deadline,waits=0u;uint8_t key=0u;
+     if(sc(SYS_RT_DEADLINE_INFO,(uint32_t)info,0,0)!=0u){put("DEADLINE: info FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}
+     release=info[0];deadline=info[1];now=info[2];
+-    put("DEADLINE: started release=");put_u32(release);put(" deadline=");put_u32(deadline);put(" now=");put_u32(now);put("\n");
++    put("DEADLINE: started release=");put_u32(release);put(" deadline=");put_u32(deadline);put(" now=");put_u32(now);put(" missed=");put_u32(info[4]);put("\n");
+     while(waits<3u){
+         if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("DEADLINE: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
+         now=timer_wait_change(now);
+         if(sc(SYS_RT_DEADLINE_INFO,(uint32_t)info,0,0)!=0u)break;
+-        put("DEADLINE: sample release=");put_u32(info[0]);put(" deadline=");put_u32(info[1]);put(" now=");put_u32(info[2]);put("\n");
++        put("DEADLINE: sample release=");put_u32(info[0]);put(" deadline=");put_u32(info[1]);put(" now=");put_u32(info[2]);put(" missed=");put_u32(info[4]);put("\n");
+         waits++;
+     }
+     {uint32_t r=sc(SYS_RT_WAIT,0,0,0);if(r==1u)put("DEADLINE: job completed after deadline (miss)\n");else if(r==0xffffffffu)put("DEADLINE: RT wait FAIL\n");else put("DEADLINE: job completed before deadline\n");}
+--- /tmp/toyos_fix_base/toyos_stage42/README.md	2026-09-18 12:12:21.000000000 +0000
++++ /tmp/toyos_fix/toyos_stage42/README.md	2026-09-18 12:26:54.524813514 +0000
+@@ -771,7 +771,7 @@
+ 
+ ## v67 RTD Stage 5.1 — абсолютный deadline одной job
+ 
+-Stage 5.1 formalizes the RT job timing model without changing the stable Stage 4.4 scheduling policy. Each RT job now records an absolute `rt_job_release_tick`, and its `rt_deadline_tick` is calculated only from that release tick plus the requested deadline interval. The deadline therefore does not move when the task is dispatched later. Timer comparisons are wrap-safe for the existing 50 Hz PIT. A new diagnostic syscall `SYS_RT_DEADLINE_INFO=42` returns the current job release tick, absolute deadline tick, current timer tick, period ticks, and missed-deadline count.
++Stage 5.1 formalizes the RT job timing model without changing the stable Stage 4.4 scheduling policy. Each RT job now records an absolute `rt_job_release_tick`, and its `rt_deadline_tick` is calculated only from that release tick plus the requested deadline interval. The deadline therefore does not move when the task is dispatched later. Timer comparisons are wrap-safe for the existing 50 Hz PIT. A new diagnostic syscall `SYS_RT_DEADLINE_INFO=42` returns the current job release tick, absolute deadline tick, current timer tick, period ticks, and missed-deadline count. Stage 5.1 FIX1 keeps the current job's release/deadline immutable even after the deadline is reached; a miss is recorded separately and the next release is created only when the current job completes via `SYS_RT_WAIT`.
+ 
+ Для runtime-проверки добавлен обычный EXE1 `DEADLINE.EXE`. Он специально не является RT-форматом: RTD загружает его так же, как `SENSOR.EXE`.
+ 
+@@ -784,7 +784,7 @@
+ 
+ Ожидается строка `DEADLINE: started release=R deadline=D now=N`, затем несколько `DEADLINE: sample ...` с тем же абсолютным `release` и `deadline`, пока `now` увеличивается. При `50 Hz` один системный tick равен 20 ms.
+ 
+-Подробности и отдельный тест: `changes/RTD/Stage5/Stage5_1/`.
++Подробности Stage 5.1: `changes/RTD/Stage5/Stage5_1/`. Исправление неизменности текущего absolute deadline: `changes/RTD/Stage5/Stage5_1_FIX1/`.
+ 
+ ## RTD change documentation
+ 
+--- /tmp/toyos_fix_base/toyos_stage42/build.sh	2026-09-18 12:09:46.000000000 +0000
++++ /tmp/toyos_fix/toyos_stage42/build.sh	2026-09-18 12:26:00.071171026 +0000
+@@ -355,6 +355,7 @@
+ sh ./check_rtd_stage4_3.sh
+ sh ./check_rtd_stage4_4.sh
+ sh ./check_rtd_stage5_1.sh
++sh ./check_rtd_stage5_1_fix1.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_fix/toyos_stage42/check_rtd_stage5_1_fix1.sh	2026-09-18 12:25:59.614482537 +0000
+@@ -0,0 +1,57 @@
++#!/bin/sh
++set -eu
++
++# Stage 5.1 FIX1: the current job's absolute release/deadline must remain
++# immutable after a deadline miss. Only a miss flag/counter may change until
++# SYS_RT_WAIT completes the current job.
++
++test -f src/kernel.c
++test -f src/rt_deadline_diag.c
++
++grep -q 'uint32_t rt_job_missed;' src/kernel.c
++grep -q 't->rt_job_missed=0u;' src/kernel.c
++
++grep -q 'if(!t->rt_job_missed)' src/kernel.c
++grep -q 't->rt_job_missed=1u;' src/kernel.c
++
++grep -q 't->rt_missed_deadlines++;' src/kernel.c
++
++grep -q 'if(t->rt_job_missed||rt_deadline_reached(now,t->rt_deadline_tick))' src/kernel.c
++
++grep -q 't->rt_job_active=0u;t->rt_job_missed=0u;' src/kernel.c
++
++# Extract the active-job deadline block and assert that it does not roll the
++# current job to the next release or block it immediately at the deadline.
++block="$(awk '/if\(t->rt_job_active&&rt_deadline_reached\(now,t->rt_deadline_tick\)\)\{/{on=1} on{print} on&&/^        \}/{exit}' src/kernel.c)"
++printf '%s\n' "$block" | grep -q 't->rt_job_missed=1u;'
++if printf '%s\n' "$block" | grep -q 't->rt_job_active=0u'; then
++    echo 'FAIL: active deadline path deactivates current job' >&2
++    exit 1
++fi
++if printf '%s\n' "$block" | grep -q 'rt_advance_release'; then
++    echo 'FAIL: active deadline path advances release' >&2
++    exit 1
++fi
++if printf '%s\n' "$block" | grep -q 'rt_deadline_tick='; then
++    echo 'FAIL: active deadline path rewrites absolute deadline' >&2
++    exit 1
++fi
++if printf '%s\n' "$block" | grep -q 'TASK_BLOCKED'; then
++    echo 'FAIL: active deadline path blocks current job' >&2
++    exit 1
++fi
++
++grep -q 'missed=' src/rt_deadline_diag.c
++
++grep -q 'check_rtd_stage5_1_fix1.sh' build.sh
++
++cc=${CC:-gcc}
++tmpdir=${TMPDIR:-/tmp}
++tmp="$tmpdir/toyos_rt_stage51_fix1_$$"
++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
++mkdir -p "$tmp"
++$cc -std=c99 -Wall -Wextra -Werror tools/test_rt_deadline.c -o "$tmp/test_rt_deadline"
++"$tmp/test_rt_deadline"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/kernel.c -o "$tmp/kernel.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_deadline_diag.c -o "$tmp/rt_deadline_diag.o"
++echo 'RTD Stage 5.1 FIX1 absolute-deadline immutability checks passed'
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_fix/toyos_stage42/changes/RTD/Stage5/Stage5_1_FIX1/RELEASE_NOTES_RU.md	2026-09-18 12:26:00.819812202 +0000
+@@ -0,0 +1,79 @@
++# ToyOS v67 RTD Stage 5.1 FIX1 — исправление неизменности абсолютного deadline
++
++## База
++
++Изменение сделано от `ToyOS v67 RTD Stage 5.1` на базе принятой архитектуры `v67.4.4 / Stage 4.4`.
++
++## Обнаруженная проблема
++
++При достижении `rt_deadline_tick` предыдущая реализация сразу выполняла перенос текущей RT job:
++
++- `rt_job_active = 0`;
++- `rt_advance_release()`;
++- пересчёт `rt_deadline_tick` для следующего release;
++- перевод задачи в `TASK_BLOCKED`.
++
++Это означало, что диагностический вызов `SYS_RT_DEADLINE_INFO` мог увидеть уже следующую пару `release/deadline`, хотя код пользовательской программы ещё не завершил текущую job через `SYS_RT_WAIT`.
++
++Для абсолютной модели это смешивало две разные сущности: **deadline текущей job** и **release следующей job**.
++
++## Исправленная модель
++
++Для активной job:
++
++```text
++release = rt_job_release_tick
++ deadline = rt_deadline_tick
++```
++
++остаются неизменными до завершения job через `SYS_RT_WAIT`.
++
++Если `now >= deadline`:
++
++```text
++rt_job_missed = 1
++rt_missed_deadlines++
++```
++
++и больше ничего в текущем `release/deadline` не изменяется.
++
++Повторное увеличение счётчика подавляется флагом `rt_job_missed`.
++
++## Завершение job
++
++`SYS_RT_WAIT`:
++
++1. определяет, был ли deadline пропущен;
++2. возвращает `1`, если был пропуск;
++3. вычисляет следующий `rt_next_release_tick`;
++4. формирует deadline следующей job;
++5. переводит текущую job в состояние ожидания.
++
++Таким образом граница между двумя jobs возникает только в точке завершения текущей job.
++
++## Диагностика
++
++`DEADLINE.EXE` теперь дополнительно печатает `missed=`.
++
++Пример:
++
++```text
++DEADLINE: started release=100 deadline=105 now=100 missed=0
++DEADLINE: sample release=100 deadline=105 now=101 missed=0
++DEADLINE: sample release=100 deadline=105 now=103 missed=0
++DEADLINE: sample release=100 deadline=105 now=106 missed=1
++```
++
++Ключевой инвариант: `release=100 deadline=105` сохраняется даже при `now=106`.
++
++## Что не изменялось
++
++- priority arbitration;
++- F10 queue;
++- ESC и `toy0>`;
++- `SYS_RT_WAIT` как точка завершения job;
++- EXE1 loader;
++- `SENSOR.EXE`, `SENSOR1.EXE`, `SENSOR2.EXE`;
++- PIT 50 Hz;
++- VGA/text;
++- EXECMT.
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_fix/toyos_stage42/changes/RTD/Stage5/Stage5_1_FIX1/TEST_PLAN_RU.md	2026-09-18 12:26:00.822502512 +0000
+@@ -0,0 +1,105 @@
++# ToyOS v67 RTD Stage 5.1 FIX1 — подробный план тестирования
++
++## 1. Host regression
++
++Из корня проекта:
++
++```sh
++sh check_rtd_stage5_1.sh
++sh check_rtd_stage5_1_fix1.sh
++```
++
++Ожидается:
++
++```text
++RTD Stage 5.1 absolute deadline checks passed
++RTD Stage 5.1 FIX1 absolute-deadline immutability checks passed
++```
++
++## 2. Runtime: команда пользователя
++
++Подготовить:
++
++```text
++exec RTD.EXE DEADLINE.EXE 1000 100 3
++```
++
++Запустить:
++
++```text
++F10
++```
++
++## 3. Что наблюдать
++
++Первая строка:
++
++```text
++DEADLINE: started release=R deadline=D now=N missed=0
++```
++
++Для 50 Hz и `deadline=100 ms`:
++
++```text
++D = R + 5
++```
++
++Пока текущая job активна, все sample-строки должны сохранять одну и ту же пару `R/D`.
++
++Пример нормального результата:
++
++```text
++DEADLINE: started release=100 deadline=105 now=100 missed=0
++DEADLINE: sample release=100 deadline=105 now=101 missed=0
++DEADLINE: sample release=100 deadline=105 now=103 missed=0
++DEADLINE: sample release=100 deadline=105 now=106 missed=1
++```
++
++Здесь `now=106` уже после deadline, но `release=100` и `deadline=105` не меняются.
++
++## 4. Что считалось ошибкой в старой версии
++
++Неправильно:
++
++```text
++release=100 deadline=105 now=101
++release=100 deadline=105 now=103
++release=150 deadline=155 now=151
++```
++
++Последняя строка уже показывает следующую job до явного завершения текущей job.
++
++## 5. Проверка miss
++
++После sample, пересёкшего deadline, `missed=` должен стать `1`, но пара `release/deadline` текущей job должна остаться неизменной.
++
++Затем `SYS_RT_WAIT` должен вернуть `1`.
++
++## 6. ESC
++
++Во время диагностики нажать:
++
++```text
++ESC
++```
++
++Ожидается:
++
++```text
++DEADLINE: ESC -> stopped
++toy0>
++```
++
++Этот тест подтверждает отсутствие регрессии механизма завершения.
++
++## 7. Регрессия Stage 4.4
++
++После проверки Stage 5.1 FIX1 повторить:
++
++```text
++exec RTD.EXE SENSOR1.EXE 20 20 3
++exec RTD.EXE SENSOR2.EXE 20 20 7
++F10
++```
++
++Обе задачи должны продолжать работать, а порядок dispatch должен оставаться таким же, как в Stage 4.4.
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_fix/toyos_stage42/changes/RTD/Stage5/Stage5_1_FIX1/VERIFICATION_RU.md	2026-09-18 12:26:00.823267066 +0000
+@@ -0,0 +1,30 @@
++# ToyOS v67 RTD Stage 5.1 FIX1 — верификация
++
++## Проверено автоматически
++
++- наличие `rt_job_missed` — PASS;
++- фиксация miss без изменения release/deadline — PASS;
++- отсутствие `rt_advance_release()` в deadline-hit path — PASS;
++- отсутствие записи нового `rt_deadline_tick` в deadline-hit path — PASS;
++- отсутствие `TASK_BLOCKED` в deadline-hit path — PASS;
++- `SYS_RT_WAIT` очищает `rt_job_missed` при завершении job — PASS;
++- `DEADLINE.EXE` выводит `missed=` — PASS;
++- host timing unit-test — PASS;
++- `kernel.c` 32-bit freestanding compile — PASS;
++- `rt_deadline_diag.c` 32-bit freestanding compile — PASS.
++
++## Runtime expectation
++
++Для команды:
++
++```text
++exec RTD.EXE DEADLINE.EXE 1000 100 3
++F10
++```
++
++абсолютные `release/deadline` одной job не меняются при пересечении deadline.
++Изменяется только состояние miss.
++
++## Ограничение среды
++
++Boot/runtime в QEMU в рабочем окружении разработки не выполнялся, так как `qemu-system-i386` отсутствует.
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_fix/toyos_stage42/changes/RTD/Stage5/Stage5_1_FIX1/ARCHIVE_MANIFEST_RU.md	2026-09-18 12:26:00.824242289 +0000
+@@ -0,0 +1,18 @@
++# Архив ToyOS v67 RTD Stage 5.1 FIX1
++
++База: `ToyOS v67 RTD Stage 5.1`.
++
++Изменения:
++
++```text
++src/kernel.c
++src/rt_deadline_diag.c
++build.sh
++README.md
++check_rtd_stage5_1_fix1.sh
++changes/RTD/Stage5/Stage5_1_FIX1/*
++```
++
++Все исторические RTD-документы хранятся в `changes/RTD/`, а исторические проектные Markdown-файлы — в `changes/ProjectHistory/`.
++
++Каталог `build/` в исходный ZIP не включается.

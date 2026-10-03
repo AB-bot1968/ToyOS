@@ -1,0 +1,374 @@
+--- /tmp/toyos_base44/toyos_stage42/src/kernel.c	2026-09-18 10:30:46.000000000 +0000
++++ /tmp/toyos_stage41/toyos_stage42/src/kernel.c	2026-09-18 12:12:45.666781378 +0000
+@@ -6,6 +6,7 @@
+ 
+ #include "path.h"
+ #include "rt_priority.h"
++#include "rt_deadline.h"
+ 
+ #define VGA ((volatile uint16_t*)0xB8000u)
+ #define W 80u
+@@ -89,6 +90,7 @@
+ #define SYS_RT_INFO        39u
+ #define SYS_RT_WAIT        40u
+ #define SYS_RT_TRACE       41u
++#define SYS_RT_DEADLINE_INFO 42u
+ #define SCHED_TASKS      25u
+ #define EXECMT_MAX_TASKS 25u
+ #define RT_MAX_TASKS      4u
+@@ -551,6 +553,7 @@
+     uint32_t rt_period_ticks;
+     uint32_t rt_next_release_tick;
+     uint32_t rt_deadline_tick;
++    uint32_t rt_job_release_tick;
+     uint32_t rt_job_active;
+     uint32_t rt_missed_deadlines;
+     uint32_t rt_runtime_ticks;
+@@ -1836,10 +1839,9 @@
+     *entry_out=h.entry;
+     return EXE_OK;
+ }
+-/* Stage 1 RT launcher: load one ordinary EXE1 into the existing isolated
+-   scheduler slot, but keep the shell as the foreground context.  Period,
+-   deadline and priority are deliberately metadata-only in this first step;
+-   later RT stages will attach release/deadline enforcement to the same record. */
++/* RT launcher: load one ordinary EXE1 into an isolated scheduler slot while
++   keeping the shell as the foreground context. RT policy fields are stored
++   in the same task record used by release/deadline/priority scheduling. */
+ struct rt_start_request {
+     char name[QUEUE_NAME_SIZE];
+     uint32_t period_ms;
+@@ -1853,7 +1855,24 @@
+  * independent RT tasks while preserving the FIX2 invariant that rt_task_id
+  * identifies the task whose CR3/context is currently installed for RT code.
+  * The shell remains a separate foreground context captured by SYS_CONSOLE_READ.
++ * Stage 5.1 adds an explicit absolute release tick for the current job and
++ * keeps deadline_tick anchored to that release rather than dispatch time.
+  */
++/* Stage 5.1: a job keeps an explicit absolute release tick. The deadline
++   is anchored to that release and never shifted by dispatch latency. */
++static void rt_begin_job(struct sched_task*t,uint32_t release_tick){
++    uint32_t dt=rt_deadline_ms_to_ticks(t->rt_deadline_ms);
++    t->rt_job_release_tick=release_tick;
++    t->rt_deadline_tick=rt_deadline_absolute(release_tick,dt);
++    t->rt_job_active=1u;
++    t->rt_runtime_ticks=0u;
++}
++static void rt_advance_release(struct sched_task*t,uint32_t now){
++    uint32_t pt=rt_deadline_ms_to_ticks(t->rt_period_ms);
++    uint32_t next=t->rt_next_release_tick+pt;
++    while(rt_deadline_reached(now,next))next+=pt;
++    t->rt_next_release_tick=next;
++}
+ static int rt_find_current(void){
+     uint32_t cr3=read_cr3(),i;
+     if(!rt_background_active)return -1;
+@@ -1888,27 +1907,24 @@
+     uint32_t i;
+     for(i=0;i<RT_MAX_TASKS;i++){
+         struct sched_task*t=&sched_tasks[i];
+-        uint32_t dt;
+         if(t->rt_period_ms==0u||t->state==TASK_STOPPED||t->state==TASK_EXIT)continue;
+-        dt=(t->rt_deadline_ms+19u)/20u;if(dt==0u)dt=1u;
+-        if(!t->rt_job_active&&now>=t->rt_next_release_tick){
+-            t->rt_job_active=1u;
+-            t->rt_runtime_ticks=0u;
+-            t->rt_deadline_tick=t->rt_next_release_tick+dt;
+-            if(now>=t->rt_deadline_tick){
++        if(!t->rt_job_active&&rt_deadline_reached(now,t->rt_next_release_tick)){
++            uint32_t release=t->rt_next_release_tick;
++            rt_begin_job(t,release);
++            if(rt_deadline_reached(now,t->rt_deadline_tick)){
+                 t->rt_missed_deadlines++;
+                 t->rt_job_active=0u;
+-                do{t->rt_next_release_tick+=t->rt_period_ticks;}while(t->rt_next_release_tick<=now);
+-                t->rt_deadline_tick=t->rt_next_release_tick+dt;
++                rt_advance_release(t,now);
++                t->rt_deadline_tick=rt_deadline_absolute(t->rt_next_release_tick,rt_deadline_ms_to_ticks(t->rt_deadline_ms));
+                 t->state=TASK_BLOCKED;
+             }else t->state=TASK_READY;
+         }
+-        if(t->rt_job_active&&now>=t->rt_deadline_tick){
++        if(t->rt_job_active&&rt_deadline_reached(now,t->rt_deadline_tick)){
+             t->rt_missed_deadlines++;
+             t->rt_job_active=0u;
+             t->rt_runtime_ticks=0u;
+-            do{t->rt_next_release_tick+=t->rt_period_ticks;}while(t->rt_next_release_tick<=now);
+-            t->rt_deadline_tick=t->rt_next_release_tick+dt;
++            rt_advance_release(t,now);
++            t->rt_deadline_tick=rt_deadline_absolute(t->rt_next_release_tick,rt_deadline_ms_to_ticks(t->rt_deadline_ms));
+             t->state=TASK_BLOCKED;
+         }
+     }
+@@ -1952,18 +1968,17 @@
+     sched_tasks[id].image_end=image_end;
+     mem_copy(sched_tasks[id].name,name,QUEUE_NAME_SIZE);
+     sched_tasks[id].rt_period_ms=req.period_ms;sched_tasks[id].rt_deadline_ms=req.deadline_ms;sched_tasks[id].rt_priority=req.priority;
+-    sched_tasks[id].rt_period_ticks=(req.period_ms+19u)/20u;if(sched_tasks[id].rt_period_ticks==0u)sched_tasks[id].rt_period_ticks=1u;
+-    {uint32_t dt=(req.deadline_ms+19u)/20u;if(dt==0u)dt=1u;
+-        sched_tasks[id].rt_next_release_tick=timer_ticks;
+-        sched_tasks[id].rt_deadline_tick=timer_ticks+dt;
+-        sched_tasks[id].rt_job_active=1u;
+-        sched_tasks[id].rt_missed_deadlines=0u;
+-        sched_tasks[id].rt_runtime_budget=1u+
+-            (sched_tasks[id].rt_period_ticks/255u)*req.priority+
+-            ((sched_tasks[id].rt_period_ticks%255u)*req.priority)/255u;
+-        if(sched_tasks[id].rt_runtime_budget>sched_tasks[id].rt_period_ticks)sched_tasks[id].rt_runtime_budget=sched_tasks[id].rt_period_ticks;
+-        if(sched_tasks[id].rt_runtime_budget==0u)sched_tasks[id].rt_runtime_budget=1u;
+-    }
++    sched_tasks[id].rt_period_ticks=rt_deadline_ms_to_ticks(req.period_ms);
++    sched_tasks[id].rt_next_release_tick=timer_ticks;
++    sched_tasks[id].rt_job_release_tick=timer_ticks;
++    sched_tasks[id].rt_deadline_tick=rt_deadline_absolute(timer_ticks,rt_deadline_ms_to_ticks(req.deadline_ms));
++    sched_tasks[id].rt_job_active=1u;
++    sched_tasks[id].rt_missed_deadlines=0u;
++    sched_tasks[id].rt_runtime_budget=1u+
++        (sched_tasks[id].rt_period_ticks/255u)*req.priority+
++        ((sched_tasks[id].rt_period_ticks%255u)*req.priority)/255u;
++    if(sched_tasks[id].rt_runtime_budget>sched_tasks[id].rt_period_ticks)sched_tasks[id].rt_runtime_budget=sched_tasks[id].rt_period_ticks;
++    if(sched_tasks[id].rt_runtime_budget==0u)sched_tasks[id].rt_runtime_budget=1u;
+     sched_tasks[id].rt_runtime_ticks=0u;sched_tasks[id].rt_dispatch_seq=0u;sched_tasks[id].state=TASK_READY;
+     rt_stop_requested&=~(1u<<id);rt_task_count++;rt_background_active=1u;
+     if(rt_task_count==1u){
+@@ -2000,9 +2015,9 @@
+     if(id<0||(f->cs&3u)==0u){f->eax=0xffffffffu;return;}
+     t=&sched_tasks[id];now=timer_ticks;
+     if(!t->rt_job_active){f->eax=0;return;}
+-    if(now>=t->rt_deadline_tick){t->rt_missed_deadlines++;f->eax=1u;}else f->eax=0u;
+-    dt=t->rt_period_ticks;next=t->rt_next_release_tick+dt;while(next<=now)next+=dt;
+-    t->rt_next_release_tick=next;t->rt_deadline_tick=next+((t->rt_deadline_ms+19u)/20u);
++    if(rt_deadline_reached(now,t->rt_deadline_tick)){t->rt_missed_deadlines++;f->eax=1u;}else f->eax=0u;
++    dt=t->rt_period_ticks;next=t->rt_next_release_tick+dt;while(rt_deadline_reached(now,next))next+=dt;
++    t->rt_next_release_tick=next;t->rt_deadline_tick=rt_deadline_absolute(next,rt_deadline_ms_to_ticks(t->rt_deadline_ms));
+     t->rt_job_active=0u;t->rt_runtime_ticks=0u;
+     mem_copy(t->words,(const void*)f,MT_CONTEXT_WORDS*4u);t->state=TASK_BLOCKED;
+     {int nextid=rt_pick_ready();if(nextid>=0){rt_switch_to(f,nextid);return;}}
+@@ -2234,7 +2249,7 @@
+         case SYS_CONSOLE_WRITE:if((f->cs&3u)&&!user_range(a,b)){f->eax=0xffffffffu;break;}f->eax=(b&&a)?console_write_atomic_n((const char*)a,b):0;break;
+         case SYS_CONSOLE_READ:{if((f->cs&3u)&&!user_rw_range(a,b)){f->eax=0xffffffffu;break;}if(b==0u){f->eax=0;break;}for(;;){uint8_t ch=key_pop();if(ch==KEY_EVENT_F10){rt_shell_waiting=0;rt_shell_hold=0u;f->eax=4u;break;}if(ch){rt_shell_waiting=0;rt_shell_hold=0u;((uint8_t*)a)[0]=ch;f->eax=1;break;}if(rt_background_active){if(rt_shell_hold){rt_shell_hold=0u;__asm__ volatile("sti;hlt;cli":::"memory");continue;}int rid=rt_pick_ready();if(rid>=0){rt_shell_waiting=1u;mem_copy(rt_shell_frame,(const void*)f,MT_CONTEXT_WORDS*4u);rt_shell_frame_valid=1u;rt_task_id=(uint32_t)rid;sched_tasks[rid].state=TASK_RUNNING;sched_tasks[rid].switches++;rt_record_dispatch(rid);load_cr3(sched_tasks[rid].cr3);mem_copy((void*)f,sched_tasks[rid].words,MT_CONTEXT_WORDS*4u);break;}}__asm__ volatile("sti;hlt;cli":::"memory");}break;}
+         case SYS_CONSOLE_POLL:{uint8_t ch=0;{int rid=rt_find_current();if(rid>=0){/* Detached RT owns only the explicit ESC stop event. All other keyboard bytes stay in the shell queue so interactive shell input cannot be consumed by SENSOR. */if(rt_stop_requested&(1u<<rid))ch=0x1bu;}else ch=key_pop();}if(ch&&((f->cs&3u)&&!user_rw_range(a,1u))){f->eax=0xffffffffu;break;}if(ch&&a&&((f->cs&3u)==0u||user_rw_range(a,1u))) *((uint8_t*)a)=ch;f->eax=(uint32_t)ch;break;}
+-        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_TRACE:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=(uint32_t)rid;((uint32_t*)a)[1]=sched_tasks[rid].rt_priority;((uint32_t*)a)[2]=sched_tasks[rid].switches;((uint32_t*)a)[3]=sched_tasks[rid].rt_dispatch_seq;((uint32_t*)a)[4]=sched_tasks[rid].state;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
++        case SYS_TIMER_GET:f->eax=timer_ticks;break;case SYS_RT_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,32u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_period_ms;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_ms;((uint32_t*)a)[2]=sched_tasks[rid].rt_priority;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_next_release_tick;((uint32_t*)a)[5]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[6]=sched_tasks[rid].rt_job_active;((uint32_t*)a)[7]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_TRACE:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=(uint32_t)rid;((uint32_t*)a)[1]=sched_tasks[rid].rt_priority;((uint32_t*)a)[2]=sched_tasks[rid].switches;((uint32_t*)a)[3]=sched_tasks[rid].rt_dispatch_seq;((uint32_t*)a)[4]=sched_tasks[rid].state;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_DEADLINE_INFO:if((f->cs&3u)&&rt_background_active){int rid=rt_find_current();if(rid>=0&&a&&user_rw_range(a,20u)){((uint32_t*)a)[0]=sched_tasks[rid].rt_job_release_tick;((uint32_t*)a)[1]=sched_tasks[rid].rt_deadline_tick;((uint32_t*)a)[2]=timer_ticks;((uint32_t*)a)[3]=sched_tasks[rid].rt_period_ticks;((uint32_t*)a)[4]=sched_tasks[rid].rt_missed_deadlines;f->eax=0;}else f->eax=0xffffffffu;}else f->eax=0xffffffffu;break;case SYS_RT_WAIT:rt_wait(f);break;
+         case SYS_DISK_READ:if((f->cs&3u)&&(c>8u||!user_rw_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_read(a,(void*)b,c)?0:0xffffffffu;break;
+         case SYS_DISK_WRITE:if((f->cs&3u)&&(c>8u||!user_range(b,c*SECTOR_SIZE))){f->eax=0xffffffffu;break;}f->eax=disk_write(a,(const void*)b,c)?0:0xffffffffu;break;
+         case SYS_FILE_OPEN:if((f->cs&3u)&&!user_cstr(a)){f->eax=0xffffffffu;break;}f->eax=(uint32_t)fat_open((const char*)a,b);break;
+--- /tmp/toyos_base44/toyos_stage42/build.sh	2026-09-18 10:30:25.000000000 +0000
++++ /tmp/toyos_stage41/toyos_stage42/build.sh	2026-09-18 12:09:46.410406321 +0000
+@@ -64,6 +64,7 @@
+ gcc $CFLAGS -c src/rt_sensor.c -o build/rt_sensor.o
+ gcc $CFLAGS -DRT_SENSOR_DIAG_ID=1 -c src/rt_sensor_diag.c -o build/rt_sensor1.o
+ gcc $CFLAGS -DRT_SENSOR_DIAG_ID=2 -c src/rt_sensor_diag.c -o build/rt_sensor2.o
++gcc $CFLAGS -c src/rt_deadline_diag.c -o build/rt_deadline_diag.o
+ 
+ # Additional EXE1 queue-validation programs. Each is linked independently at
+ # the same user image address because the kernel executes queue members
+@@ -206,6 +207,9 @@
+ ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_sensor2.pe build/rt_sensor2.o
+ objcopy --only-section=.text -O binary build/rt_sensor2.pe build/rt_sensor2.raw
+ make_exe1 build/rt_sensor2.raw build/SENSOR2.EXE 0
++ld -m i386pe --image-base 0 -e _start -T program.ld -o build/rt_deadline_diag.pe build/rt_deadline_diag.o
++objcopy --only-section=.text -O binary build/rt_deadline_diag.pe build/rt_deadline_diag.raw
++make_exe1 build/rt_deadline_diag.raw build/DEADLINE.EXE 0
+ # Тестовый графический ресурс: чистый RAW 320x200x256, ровно 64000 байт.
+ # Важно: mkfat16 ниже получает все входные файлы из каталога build/.
+ # Поэтому ресурс сначала явно копируется из исходного каталога resources/
+@@ -260,13 +264,13 @@
+     mtid=`printf '%02d' "$i"`
+     EXECMT_FILES="$EXECMT_FILES build/MT${mtid}.EXE"
+ done
+-./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
++./build/mkfat16.exe build/disk.img build/boot.bin=BOOT.BIN build/HELLO.EXE=HELLO.EXE build/COMDRV.EXE=COMDRV.EXE build/LOADER.EXE=LOADER.EXE build/NETDRV.EXE=NETDRV.EXE build/VGADRV.EXE=VGADRV.EXE build/RTD.EXE=RTD.EXE build/SENSOR.EXE=SENSOR.EXE build/SENSOR1.EXE=SENSOR1.EXE build/SENSOR2.EXE=SENSOR2.EXE build/DEADLINE.EXE=DEADLINE.EXE build/SPLASH.RAW=SPLASH.RAW$AUTOSTART_FAT_ARG build/NET.CFG=NET.CFG build/NET_MAST.CFG=NET_MAST.CFG build/NET_SLV1.CFG=NET_SLV1.CFG build/NET_SLV2.CFG=NET_SLV2.CFG build/QPASS.EXE=QPASS.EXE build/QPORT.EXE=QPORT.EXE build/QFROMEXE.EXE=QFROMEXE.EXE build/QSTOP.EXE=QSTOP.EXE build/QNESTED.EXE=QNESTED.EXE build/QFILE.EXE=QFILE.EXE build/QSIZE.EXE=QSIZE.EXE $EXECMT_FILES build/HELLO.EXE=BIN/HELLO.EXE build/NETDRV.EXE=BIN/NETDRV.EXE build/NET.CFG=DOC/NET.CFG
+ 
+ test -s build/disk.img || { echo "ERROR: mkfat16 finished without creating build/disk.img" >&2; exit 1; }
+ echo "[FAT16] disk.img created: `wc -c < build/disk.img | tr -d ' '` bytes"
+ 
+ # Verify every shipped EXE1 entry before writing the boot sector/kernel.
+-for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
++for qname in BOOT.BIN HELLO.EXE COMDRV.EXE LOADER.EXE NETDRV.EXE VGADRV.EXE RTD.EXE SENSOR.EXE SENSOR1.EXE SENSOR2.EXE DEADLINE.EXE SPLASH.RAW NET.CFG NET_MAST.CFG NET_SLV1.CFG NET_SLV2.CFG QPASS.EXE QPORT.EXE QFROMEXE.EXE QSTOP.EXE QNESTED.EXE QFILE.EXE QSIZE.EXE; do
+     ./build/fat16check.exe build/disk.img "$qname"
+ done
+ if [ -f build/AUTOSTART.SH ]; then
+@@ -350,6 +354,7 @@
+ sh ./check_rtd_stage4_2.sh
+ sh ./check_rtd_stage4_3.sh
+ sh ./check_rtd_stage4_4.sh
++sh ./check_rtd_stage5_1.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+--- /tmp/toyos_base44/toyos_stage42/README.md	2026-09-18 10:30:25.000000000 +0000
++++ /tmp/toyos_stage41/toyos_stage42/README.md	2026-09-18 12:12:21.396566986 +0000
+@@ -769,6 +769,23 @@
+ 
+ The focused Stage 4.2 regression is `check_rtd_stage4_2.sh`; its documentation is stored in `changes/RTD/Stage4/Stage4_2/`.
+ 
++## v67 RTD Stage 5.1 — абсолютный deadline одной job
++
++Stage 5.1 formalizes the RT job timing model without changing the stable Stage 4.4 scheduling policy. Each RT job now records an absolute `rt_job_release_tick`, and its `rt_deadline_tick` is calculated only from that release tick plus the requested deadline interval. The deadline therefore does not move when the task is dispatched later. Timer comparisons are wrap-safe for the existing 50 Hz PIT. A new diagnostic syscall `SYS_RT_DEADLINE_INFO=42` returns the current job release tick, absolute deadline tick, current timer tick, period ticks, and missed-deadline count.
++
++Для runtime-проверки добавлен обычный EXE1 `DEADLINE.EXE`. Он специально не является RT-форматом: RTD загружает его так же, как `SENSOR.EXE`.
++
++Пример:
++
++```text
++exec RTD.EXE DEADLINE.EXE 1000 100 3
++F10
++```
++
++Ожидается строка `DEADLINE: started release=R deadline=D now=N`, затем несколько `DEADLINE: sample ...` с тем же абсолютным `release` и `deadline`, пока `now` увеличивается. При `50 Hz` один системный tick равен 20 ms.
++
++Подробности и отдельный тест: `changes/RTD/Stage5/Stage5_1/`.
++
+ ## RTD change documentation
+ 
+ Начиная с RTD Stage 3, пояснения изменений RTD, планы тестирования и patch-файлы хранятся в `changes/RTD/` с разбиением по этапам и FIX. Исполняемые regression-тесты остаются в корне проекта и подключаются из `build.sh`.
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_stage41/toyos_stage42/check_rtd_stage5_1.sh	2026-09-18 12:11:24.880607947 +0000
+@@ -0,0 +1,47 @@
++#!/bin/sh
++set -eu
++
++test -f src/rt_deadline.h
++test -f src/rt_deadline_diag.c
++test -f tools/test_rt_deadline.c
++
++grep -Eq '#define SYS_RT_DEADLINE_INFO[[:space:]]+42u' src/kernel.c
++grep -q 'rt_job_release_tick' src/kernel.c
++grep -q 'rt_deadline_ms_to_ticks' src/kernel.c
++grep -q 'rt_deadline_reached' src/kernel.c
++grep -q 'rt_deadline_absolute' src/kernel.c
++grep -q 'rt_begin_job' src/kernel.c
++grep -q 'rt_job_release_tick=timer_ticks' src/kernel.c
++grep -q 'case SYS_RT_DEADLINE_INFO' src/kernel.c
++grep -q 'sched_tasks\[rid\].rt_job_release_tick' src/kernel.c
++
++grep -q 'rt_deadline_reached(now,t->rt_deadline_tick)' src/kernel.c
++grep -q 'rt_deadline_absolute(t->rt_next_release_tick' src/kernel.c
++grep -q 'build/DEADLINE.EXE=DEADLINE.EXE' build.sh
++grep -q 'make_exe1 build/rt_deadline_diag.raw build/DEADLINE.EXE 0' build.sh
++grep -q 'src/rt_deadline_diag.c' build.sh
++grep -q 'check_rtd_stage5_1.sh' build.sh
++
++grep -q 'DEADLINE: started release=' src/rt_deadline_diag.c
++grep -q 'DEADLINE: sample release=' src/rt_deadline_diag.c
++grep -q 'SYS_RT_DEADLINE_INFO' src/rt_deadline_diag.c
++grep -q 'DEADLINE: job completed before deadline' src/rt_deadline_diag.c
++
++grep -q 'exec RTD.EXE DEADLINE.EXE 1000 100 3' README.md
++
++grep -q 'changes/RTD/Stage5/Stage5_1' README.md
++
++cc=${CC:-gcc}
++tmpdir=${TMPDIR:-/tmp}
++tmp="$tmpdir/toyos_rt_stage51_$$"
++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
++mkdir -p "$tmp"
++$cc -std=c99 -Wall -Wextra -Werror tools/test_rt_deadline.c -o "$tmp/test_rt_deadline"
++"$tmp/test_rt_deadline"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/kernel.c -o "$tmp/kernel.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/user_shell.c -o "$tmp/user_shell.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rtd.c -o "$tmp/rtd.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_sensor.c -o "$tmp/rt_sensor.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_sensor_diag.c -o "$tmp/rt_sensor_diag.o"
++$cc -m32 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Os -Wall -Wextra -nostdinc -nostdlib -c src/rt_deadline_diag.c -o "$tmp/rt_deadline_diag.o"
++echo 'RTD Stage 5.1 absolute deadline checks passed'
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_stage41/toyos_stage42/src/rt_deadline.h	2026-09-18 12:11:24.399640369 +0000
+@@ -0,0 +1,22 @@
++#ifndef TOYOS_RT_DEADLINE_H
++#define TOYOS_RT_DEADLINE_H
++
++/* Stage 5.1: absolute RT job timing on the existing 50 Hz PIT. */
++static inline unsigned int rt_deadline_ms_to_ticks(unsigned int ms){
++    unsigned int q=ms/20u;
++    if(ms%20u)q++;
++    return q?q:1u;
++}
++
++/* A deadline is reached at or after target in modulo-2^32 timer space.
++   The comparison is valid for the normal RT interval, which is below
++   2^31 ticks. This also handles timer wrap without using signed overflow. */
++static inline int rt_deadline_reached(unsigned int now,unsigned int target){
++    return (unsigned int)(now-target)<0x80000000u;
++}
++
++static inline unsigned int rt_deadline_absolute(unsigned int release_tick,unsigned int deadline_ticks){
++    return release_tick+deadline_ticks;
++}
++
++#endif
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_stage41/toyos_stage42/src/rt_deadline_diag.c	2026-09-18 12:10:35.601510725 +0000
+@@ -0,0 +1,39 @@
++/* DEADLINE.EXE - Stage 5.1 absolute-deadline diagnostic EXE1.
++ * It is an ordinary ToyOS EXE1 program.  The kernel creates one RT job with
++ * an absolute release tick and deadline tick; this program prints both while
++ * the current job is active so the deadline can be checked against timer_ticks.
++ */
++typedef unsigned int uint32_t;
++typedef unsigned char uint8_t;
++#define SYS_CONSOLE_WRITE 1u
++#define SYS_TIMER_GET     3u
++#define SYS_CONSOLE_POLL 37u
++#define SYS_RT_INFO      39u
++#define SYS_RT_WAIT      40u
++#define SYS_RT_DEADLINE_INFO 42u
++#define SYS_EXIT         12u
++static uint32_t sc(uint32_t n,uint32_t a,uint32_t b,uint32_t c){uint32_t r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b),"d"(c):"memory");return r;}
++static void put(const char*s){uint32_t n=0u;while(s[n])n++;sc(SYS_CONSOLE_WRITE,(uint32_t)s,n,0);}
++static void put_u32(uint32_t v){char b[12];uint32_t i=0u,j;char t;if(v==0u){put("0");return;}while(v&&i<10u){b[i++]=(char)('0'+v%10u);v/=10u;}for(j=0;j<i/2u;j++){t=b[j];b[j]=b[i-1u-j];b[i-1u-j]=t;}b[i]=0;put(b);}
++static uint32_t timer_wait_change(uint32_t start){uint32_t now=start;while(now==start)now=sc(SYS_TIMER_GET,0,0,0);return now;}
++__attribute__((section(".usertext"))) void program_main(void){
++    uint32_t info[5],now,release,deadline,waits=0u;uint8_t key=0u;
++    if(sc(SYS_RT_DEADLINE_INFO,(uint32_t)info,0,0)!=0u){put("DEADLINE: info FAIL\n");sc(SYS_EXIT,1,0,0);for(;;){}}
++    release=info[0];deadline=info[1];now=info[2];
++    put("DEADLINE: started release=");put_u32(release);put(" deadline=");put_u32(deadline);put(" now=");put_u32(now);put("\n");
++    while(waits<3u){
++        if(sc(SYS_CONSOLE_POLL,(uint32_t)&key,0,0)==0x1bu&&key==0x1bu){put("DEADLINE: ESC -> stopped\n");sc(SYS_EXIT,0,0,0);for(;;){}}
++        now=timer_wait_change(now);
++        if(sc(SYS_RT_DEADLINE_INFO,(uint32_t)info,0,0)!=0u)break;
++        put("DEADLINE: sample release=");put_u32(info[0]);put(" deadline=");put_u32(info[1]);put(" now=");put_u32(info[2]);put("\n");
++        waits++;
++    }
++    {uint32_t r=sc(SYS_RT_WAIT,0,0,0);if(r==1u)put("DEADLINE: job completed after deadline (miss)\n");else if(r==0xffffffffu)put("DEADLINE: RT wait FAIL\n");else put("DEADLINE: job completed before deadline\n");}
++    sc(SYS_EXIT,0,0,0);for(;;){}
++}
++__asm__(
++".section .start,\"ax\"\n"
++".global _start\n"
++"_start:\n"
++"jmp _program_main\n"
++);
+--- /dev/null	2026-09-18 12:08:06.075616726 +0000
++++ /tmp/toyos_stage41/toyos_stage42/tools/test_rt_deadline.c	2026-09-18 12:11:24.400665316 +0000
+@@ -0,0 +1,30 @@
++#include <limits.h>
++#include "../src/rt_deadline.h"
++
++static int expect_u(unsigned int got,unsigned int want,int code){return got==want?0:code;}
++static int expect_i(int got,int want,int code){return got==want?0:code;}
++
++int main(void){
++    int r;
++
++    /* 50 Hz PIT: ceil(ms / 20), with a one-tick minimum. */
++    r=expect_u(rt_deadline_ms_to_ticks(1u),1u,1); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(20u),1u,2); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(21u),2u,3); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(100u),5u,4); if(r)return r;
++    r=expect_u(rt_deadline_ms_to_ticks(UINT_MAX),214748365u,5); if(r)return r;
++
++    /* Absolute deadline = release + deadline interval, independent of
++       dispatch time. */
++    r=expect_u(rt_deadline_absolute(100u,5u),105u,6); if(r)return r;
++    r=expect_i(rt_deadline_reached(104u,105u),0,7); if(r)return r;
++    r=expect_i(rt_deadline_reached(105u,105u),1,8); if(r)return r;
++    r=expect_i(rt_deadline_reached(106u,105u),1,9); if(r)return r;
++
++    /* Absolute arithmetic deliberately wraps as uint32_t; the comparison
++       remains correct around the timer wrap. */
++    r=expect_u(rt_deadline_absolute(0xfffffff0u,32u),16u,10); if(r)return r;
++    r=expect_i(rt_deadline_reached(0u,0xfffffff0u),1,11); if(r)return r;
++    r=expect_i(rt_deadline_reached(0xfffffff0u,16u),0,12); if(r)return r;
++    return 0;
++}

@@ -1,0 +1,276 @@
+TOYOS v67.11-B FIX60Q — СТАБИЛЬНАЯ ПРИНЯТАЯ ВЕРСИЯ QEMU / SONARSIM:
+КОМАНДЫ ЗАПУСКА И ПАРАМЕТРЫ Дата фиксации: 2026-09-30
+
+СТАТУС FIX60Q принят как стабильная базовая версия после успешной
+проверки в W64DevKit/QEMU: - TESTUART.TST — PASS; - TESTSONP.TST — PASS,
+включая 1000 успешных SONAR-циклов; - TESTRXP.TST — PASS; - UARTRX.EXE
+через QEMU TCP socket — работает; - execmt SONARDRV.EXE через QEMU TCP
+socket — работает; - shell ToyOS остается работоспособным при фоновой
+работе SONARDRV.
+
+Рекомендуемый стенд разработки под Windows: ToyOS COM1 (ISA 16550,
+0x3F8) <-> QEMU socket chardev <-> localhost TCP <-> SONARSIM.
+
+Windows COM1 <-> com0com <-> COM2 оставлен как legacy/experimental
+вариант и НЕ используется как основной критерий исправности ToyOS,
+поскольку именно при inbound RX через этот host-side тракт наблюдалось
+зависание QEMU.
+
+====================================================================== 1.
+РЕКОМЕНДУЕМЫЙ СТЕНД: QEMU TCP SOCKET <-> SONARSIM
+======================================================================
+
+ПОРЯДОК ЗАПУСКА: 1) Сначала запустить QEMU — он создает TCP server на
+127.0.0.1:4555. 2) Дождаться загрузки ToyOS. 3) Запустить SONARSIM в
+режиме –tcp. 4) Убедиться, что SONARSIM вывел READY bounded-socket-io.
+5) В ToyOS для минимальной проверки можно выполнить: execmt UARTRX.EXE
+затем: mtstop ALL uartreset 6) Для production-проверки выполнить: execmt
+SONARDRV.EXE
+
+QEMU, многострочный вариант для Windows CMD:
+
+qemu-system-i386.exe -drive format=raw,file=build_os.img -m 16M ^
+-chardev socket,id=sonar,host=127.0.0.1,port=4555,server,nowait,nodelay
+^ -device isa-serial,chardev=sonar,iobase=0x3f8,irq=4
+
+Тот же запуск одной строкой:
+
+qemu-system-i386.exe -drive format=raw,file=build_os.img -m 16M -chardev
+socket,id=sonar,host=127.0.0.1,port=4555,server,nowait,nodelay -device
+isa-serial,chardev=sonar,iobase=0x3f8,irq=4
+
+SONARSIM:
+
+SONARSIM.EXE –tcp 127.0.0.1 4555 –slave 1 –mode normal –xyz 123456
+-654321 2000000000
+
+Ожидаемая строка готовности:
+
+SONARSIM: TCP 127.0.0.1:4555 slave=1 mode=0 READY bounded-socket-io
+
+При нормальном обмене должны непрерывно появляться строки вида:
+
+request=1 xyz=123456,-654321,2000000000 response=17 tx=17 request=2
+xyz=123456,-654321,2000000000 response=17 tx=17 request=3
+xyz=123456,-654321,2000000000 response=17 tx=17
+
+Значение response=17 означает длину сформированного Modbus-ответа.
+Значение tx=17 означает, что все 17 байтов ответа фактически переданы.
+tx=TIMEOUT означает, что передача не завершилась за ограниченное время.
+
+ПОЯСНЕНИЕ ПАРАМЕТРОВ QEMU: -drive format=raw,file=build_os.img
+Подключает build_os.img как RAW-диск. format=raw явно запрещает QEMU
+интерпретировать образ как другой формат.
+
+-m 16M Выделяет виртуальной машине 16 MiB RAM.
+
+-chardev socket,id=sonar,… Создает host-side символьный канал QEMU типа
+TCP socket.
+
+id=sonar Внутреннее имя chardev. Этим именем последующий -device
+isa-serial связывает виртуальный COM1 с TCP-каналом.
+
+host=127.0.0.1 QEMU слушает только localhost. Канал не публикуется во
+внешнюю сеть.
+
+port=4555 TCP-порт стенда. Это значение должно совпадать с портом в
+SONARSIM.EXE –tcp 127.0.0.1 4555.
+
+server QEMU работает как TCP server, SONARSIM — как TCP client.
+
+nowait QEMU не блокирует запуск виртуальной машины в ожидании
+подключения SONARSIM. Поэтому SONARSIM можно запускать после загрузки
+QEMU/ToyOS.
+
+nodelay Просит TCP отключить алгоритм Nagle для этого соединения,
+уменьшая задержку небольших Modbus-кадров.
+
+-device isa-serial,chardev=sonar,iobase=0x3f8,irq=4 Создает для гостя
+обычный ISA UART/16550 и связывает его с chardev sonar.
+
+iobase=0x3f8 Базовый I/O-адрес COM1, который использует ToyOS.
+
+irq=4 Стандартная линия IRQ4 COM1. В текущей архитектуре production UART
+ToyOS работает polling-способом, IER=0 и IRQ4 маскирован, но устройство
+сохраняет стандартную аппаратную конфигурацию.
+
+======================================================================
+2. LEGACY/EXPERIMENTAL: WINDOWS COM1 <-> com0com <-> COM2
+======================================================================
+
+Схема:
+
+ToyOS guest COM1 0x3F8 <-> QEMU -serial COM1 <-> Windows COM1 <->
+com0com <-> Windows COM2 <-> SONARSIM
+
+QEMU:
+
+d:-system-i386.exe -hda build_os.img -m 16M -serial COM1
+
+Вариант с образом в текущем каталоге:
+
+d:-system-i386.exe -hda toy_os.img -m 16M -serial COM1
+
+SONARSIM:
+
+SONARSIM.EXE –port COM2 –baud 115200 –slave 1 –mode normal –xyz 123456
+-654321 2000000000
+
+Для этого режима ожидаемая строка готовности содержит:
+
+READY bounded-overlapped-io
+
+Этот тракт сохранен для совместимости и будущих экспериментов с
+реальными последовательными устройствами, но связка старого Windows QEMU
+COM backend с виртуальной парой com0com НЕ является acceptance path
+FIX60Q.
+
+======================================================================
+3. ДИАГНОСТИКА ТОЛЬКО TX: QEMU -> ФАЙЛ
+======================================================================
+
+Команда, использованная для изоляции проблемы RX:
+
+d:-system-i386.exe -drive format=raw,file=toy_os.img -chardev
+file,id=comlog,path=com1_tx.bin -device
+isa-serial,chardev=comlog,iobase=0x3f8,irq=4
+
+Назначение: - гостевой COM1 остается на 0x3F8; - все передаваемые ToyOS
+байты записываются в com1_tx.bin; - обратного RX-канала от файла к ToyOS
+нет; - рост com1_tx.bin при execmt SONARDRV.EXE подтверждает длительную
+работу TX; - этот режим является диагностическим и не заменяет
+двунаправленный TCP-стенд.
+
+Параметры: -chardev file,id=comlog,path=com1_tx.bin Создает
+однонаправленный файловый sink для TX виртуального UART.
+
+id=comlog Имя этого chardev.
+
+path=com1_tx.bin Файл, в который QEMU накапливает байты, переданные
+гостем через COM1.
+
+-device isa-serial,chardev=comlog,iobase=0x3f8,irq=4 Подключает гостевой
+ISA UART COM1 к файловому chardev.
+
+======================================================================
+4. ВСЕ ПАРАМЕТРЫ SONARSIM FIX60Q
+======================================================================
+
+Полная форма:
+
+SONARSIM (–port COM2 | –tcp HOST PORT) [–baud 115200] [–slave 1] [–mode
+normal|no-response|bad-crc|delay|partial|exception] [–delay-ms 250]
+[–xyz X Y Z]
+
+Также поддерживается:
+
+SONARSIM.EXE –selftest
+
+–port COM2 Выбирает Windows serial transport и имя COM-порта. Пример:
+–port COM2. Если –port не указан и –tcp не указан, исходный код
+использует COM2 как значение по умолчанию. В serial-режиме SONARSIM
+настраивает 8N1 без flow control. Для стенда FIX60Q этот режим не
+является рекомендуемым QEMU acceptance path.
+
+–tcp HOST PORT Выбирает TCP transport вместо Windows COM. HOST — имя или
+IP TCP-сервера QEMU. PORT — номер порта 1..65535. Пример: –tcp 127.0.0.1
+4555. При использовании –tcp параметр –baud не управляет TCP-скоростью:
+baud относится к serial/COM transport. Modbus byte stream при этом
+остается тем же, а ToyOS по-прежнему работает с гостевым UART COM1.
+
+–baud 115200 Скорость Windows COM-порта в бит/с. По умолчанию: 115200.
+Используется в режиме –port. Текущий стенд SONARDRV рассчитан на 115200
+8N1.
+
+–slave 1 Modbus RTU slave address. Допустимый диапазон SONARSIM: 1..247.
+По умолчанию: 1. Текущий SONARDRV обращается к slave=1, поэтому для
+штатного стенда значение должно оставаться 1.
+
+–mode normal Выбирает поведение симулятора. По умолчанию: normal.
+
+normal На каждый корректный запрос возвращается корректный Modbus
+Function 04 response. Для SONAR-запроса штатная длина ответа — 17
+байтов.
+
+no-response Корректный запрос распознается, но ответ намеренно не
+передается. В консоли SONARSIM выводится response=SUPPRESSED.
+Используется для проверки timeout/retry/recovery.
+
+bad-crc Формируется ответ нормальной длины, после чего CRC намеренно
+повреждается. Используется для проверки обнаружения CRC error и retry.
+
+delay Перед передачей полного ответа выполняется задержка –delay-ms.
+Используется для проверки временных границ, timeout и delayed response.
+
+partial Корректный ответ делится примерно пополам: сначала передается
+первая часть, затем выполняется задержка –delay-ms, затем передается
+оставшаяся часть. Используется для проверки сборки Modbus-кадра из
+частичных RX-фрагментов.
+
+exception Вместо нормального Function 04 response возвращается Modbus
+exception: function 0x84, exception code 4. Длина такого ответа — 5
+байтов.
+
+–delay-ms 250 Задержка в миллисекундах для режимов delay и partial. По
+умолчанию: 250 ms. В normal/no-response/bad-crc/exception этот параметр
+не задает обычную периодичность запросов SONARDRV.
+
+–xyz X Y Z Фиксирует координаты, которые SONARSIM возвращает в
+normal-compatible ответах. X, Y и Z — signed int32, единица измерения
+контракта SONARDRV: миллиметры. Пример: –xyz 123456 -654321 2000000000
+Отрицательные значения допустимы. В Modbus они передаются как signed
+int32: старший 16-bit register первым, байты внутри регистра —
+big-endian.
+
+Если –xyz НЕ указан, SONARSIM генерирует изменяющиеся координаты на
+каждом корректном запросе. Это полезно для проверки, что клиент получает
+новые измерения, а не повторно показывает старые данные.
+
+–selftest Выполняет внутренний тест SONARSIM и завершает программу.
+Проверяются CRC16, нормальный 17-byte response, кодирование XYZ,
+bad-crc, exception и отбрасывание запроса с неправильным CRC. Успех:
+SONARSIM SELFTEST: PASS Для –selftest подключение к QEMU/COM/TCP не
+требуется.
+
+======================================================================
+5. MODBUS-КОНТРАКТ SONARSIM <-> SONARDRV
+======================================================================
+
+Штатный запрос SONARDRV: - slave address: 1; - function: 04 (Read Input
+Registers); - start register: 0; - count: 6 registers.
+
+Нормальный ответ: - 17 байтов; - byte count: 12; - X/Y/Z: три signed
+int32 значения; - каждое int32 занимает два 16-bit Modbus register; -
+high 16-bit register идет первым; - байты внутри каждого register идут
+big-endian; - в конце Modbus RTU CRC16.
+
+======================================================================
+6. РЕКОМЕНДУЕМАЯ ПРИЕМКА СТАБИЛЬНОЙ FIX60Q
+======================================================================
+
+Перед физическим стендом:
+
+test TESTUART.TST test TESTSONP.TST test TESTRXP.TST
+
+Для TCP end-to-end: 1) Запустить QEMU TCP server. 2) Запустить SONARSIM
+–tcp. 3) Убедиться в READY bounded-socket-io. 4) При необходимости:
+execmt UARTRX.EXE затем: mtstop ALL uartreset 5) Запустить: execmt
+SONARDRV.EXE 6) Проверить, что SONARSIM продолжает выдавать request=N …
+response=17 tx=17, а консоль ToyOS остается доступной.
+
+Для диагностики UART в ToyOS: uartstat
+
+После диагностической задачи: mtstop ALL uartreset
+
+======================================================================
+7. ИТОГ
+======================================================================
+
+Основной стенд стабильной FIX60Q: QEMU TCP socket + SONARSIM –tcp.
+
+Он сохраняет для ToyOS настоящий гостевой ISA 16550 COM1 на 0x3F8 и тот
+же Modbus RTU byte stream, но исключает проблемную host-side цепочку
+Windows COM/com0com из основной приемки.
+
+Исходный код ToyOS/SONARDRV не зависит от TCP: TCP существует только
+между host-side chardev QEMU и SONARSIM.

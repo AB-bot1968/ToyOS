@@ -1,0 +1,304 @@
+--- /tmp/toyos_s41/src/kernel.c	2026-09-18 09:10:52.000000000 +0000
++++ src/kernel.c	2026-09-18 09:54:09.733351474 +0000
+@@ -5,6 +5,7 @@
+ typedef int int32_t;
+ 
+ #include "path.h"
++#include "rt_priority.h"
+ 
+ #define VGA ((volatile uint16_t*)0xB8000u)
+ #define W 80u
+
+--- /tmp/toyos_s41/build.sh	2026-09-18 09:10:52.000000000 +0000
++++ build.sh	2026-09-18 09:54:53.414005649 +0000
+@@ -338,6 +338,7 @@
+ sh ./check_rtd_stage3_fix3.sh
+ sh ./check_rtd_stage3_fix4.sh
+ sh ./check_rtd_stage3_f10.sh
++sh ./check_rtd_stage4_1.sh
+ ./check71.sh
+ ./check72.sh
+ ./check73.sh
+
+--- /tmp/toyos_s41/changes/RTD/README_RU.md	2026-09-18 09:12:14.000000000 +0000
++++ changes/RTD/README_RU.md	2026-09-18 09:54:43.697108804 +0000
+@@ -9,6 +9,7 @@
+ - `Stage3/` — несколько RT-задач;
+ - `Stage3_F10/` — подготовка RT-команд и запуск по F10;
+ - `Stage3_F10_FIX1/` — исправление Ring-3 page fault из-за mutable shell state.
++- `Stage4/` — Stage 4.1: чистый компаратор priority с unit-test; фактическое priority arbitration ещё не подключено.
+ 
+ Исторические Markdown-файлы проекта зеркалируются в `changes/ProjectHistory/`.
+ Корневые копии сохранены для совместимости с существующими regression-checks.
+
+--- /dev/null	2026-09-18 09:53:29.563890569 +0000
++++ src/rt_priority.h	2026-09-18 09:54:09.885177715 +0000
+@@ -0,0 +1,20 @@
++#ifndef TOYOS_RT_PRIORITY_H
++#define TOYOS_RT_PRIORITY_H
++
++/* Stage 4.1: pure priority comparator.
++ *
++ * Higher numeric priority means higher scheduling priority.  The comparator
++ * is deliberately side-effect free and is not wired into rt_pick_ready() in
++ * Stage 4.1; arbitration remains unchanged until the dedicated Stage 4.2.
++ * Return value follows the conventional three-way comparison:
++ *   >0  when a has higher priority than b
++ *    0  when priorities are equal
++ *   <0  when a has lower priority than b
++ */
++static inline int rt_priority_compare(uint32_t a, uint32_t b){
++    if(a>b)return 1;
++    if(a<b)return -1;
++    return 0;
++}
++
++#endif
+
+--- /dev/null	2026-09-18 09:53:29.563890569 +0000
++++ tools/test_rt_priority.c	2026-09-18 09:54:09.885684848 +0000
+@@ -0,0 +1,12 @@
++#include <stdint.h>
++#include "../src/rt_priority.h"
++
++int main(void){
++    if(rt_priority_compare(0u,0u)!=0)return 1;
++    if(rt_priority_compare(1u,0u)<=0)return 2;
++    if(rt_priority_compare(255u,1u)<=0)return 3;
++    if(rt_priority_compare(0u,1u)>=0)return 4;
++    if(rt_priority_compare(1u,255u)>=0)return 5;
++    if(rt_priority_compare(127u,127u)!=0)return 6;
++    return 0;
++}
+
+--- /dev/null	2026-09-18 09:53:29.563890569 +0000
++++ check_rtd_stage4_1.sh	2026-09-18 09:54:09.886850320 +0000
+@@ -0,0 +1,25 @@
++#!/bin/sh
++set -eu
++
++test -f src/rt_priority.h
++test -f tools/test_rt_priority.c
++
++grep -q 'static inline int rt_priority_compare' src/rt_priority.h
++grep -q 'if(a>b)return 1;' src/rt_priority.h
++grep -q 'if(a<b)return -1;' src/rt_priority.h
++grep -q 'return 0;' src/rt_priority.h
++
++# Stage 4.1 must not alter arbitration yet.
++grep -q '/* Stage 3 uses EDF as its deterministic ready-order' src/kernel.c
++grep -q 'rt_deadline_tick<sched_tasks\[best\].rt_deadline_tick' src/kernel.c
++
++# Unit-test the exact comparator header used by kernel.c.
++cc=${CC:-gcc}
++tmpdir=${TMPDIR:-/tmp}
++tmp="$tmpdir/toyos_rt_priority_$$"
++trap 'rm -rf "$tmp"' EXIT HUP INT TERM
++mkdir -p "$tmp"
++$cc -std=c99 -Wall -Wextra -Werror tools/test_rt_priority.c -o "$tmp/test_rt_priority"
++"$tmp/test_rt_priority"
++
++echo 'RTD Stage 4.1 priority comparator checks passed'
+
+--- /dev/null	2026-09-18 09:53:29.563890569 +0000
++++ changes/RTD/Stage4/Stage4_1/RELEASE_NOTES_RU.md	2026-09-18 09:54:43.233059356 +0000
+@@ -0,0 +1,89 @@
++# ToyOS v67 RTD — Stage 4.1: компаратор приоритета
++
++## 1. База
++
++Этап начат от зафиксированной рабочей версии:
++
++- `ToyOS v67 RTD Stage3 F10 FIX1`.
++
++Цель этапа — реализовать только чистую функцию сравнения RT-приоритетов и отдельный unit-test. Фактический выбор RT-задачи по приоритету на этом этапе **не включается**.
++
++## 2. Изменение №1 — отдельный заголовок `src/rt_priority.h`
++
++Добавлен общий для ядра и unit-test заголовок `src/rt_priority.h`.
++
++Функция:
++
++```c
++rt_priority_compare(a, b)
++```
++
++имеет трёхзначный результат:
++
++- `> 0` — `a` имеет более высокий приоритет, чем `b`;
++- `0` — приоритеты равны;
++- `< 0` — `a` имеет более низкий приоритет, чем `b`.
++
++Правило Stage 4.1: **большее числовое значение `priority` означает более высокий RT-приоритет**.
++
++Функция не изменяет аргументы и не имеет побочных эффектов.
++
++## 3. Изменение №2 — подключение функции к `kernel.c`
++
++`src/kernel.c` подключает `rt_priority.h`.
++
++Это делает компаратор частью исходного кода ядра, но он пока не используется планировщиком.
++
++## 4. Изменение №3 — scheduler behaviour preserved
++
++`rt_pick_ready()` в Stage 4.1 не изменялся.
++
++Следовательно, данная версия не меняет алгоритм выбора готовой RT-задачи. `period`, `deadline`, `SYS_RT_WAIT`, ESC, F10 и shell остаются на поведении Stage 3 F10 FIX1.
++
++## 5. Изменение №4 — отдельный unit-test
++
++Добавлен:
++
++```text
++tools/test_rt_priority.c
++```
++
++Тест использует **тот же `src/rt_priority.h`**, который подключается ядром. Проверяются:
++
++- `0 == 0`;
++- `1 > 0`;
++- `255 > 1`;
++- `0 < 1`;
++- `1 < 255`;
++- `127 == 127`.
++
++## 6. Изменение №5 — regression test
++
++Добавлен:
++
++```text
++check_rtd_stage4_1.sh
++```
++
++Тест проверяет существование компаратора, его форму, использование общего заголовка unit-test и отсутствие подключения компаратора к `rt_pick_ready()`.
++
++## 7. Совместимость
++
++Не изменялись:
++
++- EXE1 ABI;
++- обычный загрузчик EXE1;
++- `SENSOR.EXE`;
++- `SYS_RT_START=38`;
++- `SYS_RT_INFO=39`;
++- `SYS_RT_WAIT=40`;
++- F10 queue/launch flow;
++- ESC completion;
++- сохранённый shell context;
++- VGA/text transition;
++- PIT 50 Hz;
++- EXECMT.
++
++## 8. Следующий этап
++
++Stage 4.2 будет отдельно подключать `rt_priority_compare()` к алгоритму выбора готовой RT-задачи. До этого этапа priority arbitration намеренно не меняется.
+
+--- /dev/null	2026-09-18 09:53:29.563890569 +0000
++++ changes/RTD/Stage4/Stage4_1/TEST_PLAN_RU.md	2026-09-18 09:54:43.233840133 +0000
+@@ -0,0 +1,45 @@
++# ToyOS v67 RTD — Stage 4.1: план тестирования
++
++## Тест 1 — unit-test компаратора
++
++Команда:
++
++```sh
++sh check_rtd_stage4_1.sh
++```
++
++Ожидаемый результат:
++
++```text
++RTD Stage 4.1 priority comparator checks passed
++```
++
++## Тест 2 — компиляция ядра
++
++```sh
++gcc -m32 -Os -ffreestanding -fno-pie -fno-stack-protector -nostdinc -nostdlib -c src/kernel.c -o /tmp/kernel.o
++```
++
++Ожидается успешная компиляция.
++
++## Тест 3 — регрессия RTD Stage 3
++
++Запустить все существующие RTD focused checks из базовой версии. Ни один из них не должен требовать изменения поведения priority selection, потому что Stage 4.1 его ещё не подключает.
++
++## Тест 4 — runtime invariance
++
++На реальной ToyOS не ожидается изменения поведения команды:
++
++```text
++exec RTD.EXE SENSOR.EXE 20 20 3
++```
++
++Должны сохраниться ранее подтверждённые `tick`, ESC-завершение и `toy0>`.
++
++## Тест 5 — подготовка к Stage 4.2
++
++Проверить, что `rt_pick_ready()` по-прежнему использует прежний критерий выбора. Этот факт фиксируется статической проверкой и обеспечивает изоляцию Stage 4.1.
++
++## Ограничение
++
++Stage 4.1 не предоставляет отдельного пользовательского способа наблюдать работу компаратора. Это намеренно: компаратор — подготовленная функция ядра для следующего этапа.
+
+--- /dev/null	2026-09-18 09:53:29.563890569 +0000
++++ changes/RTD/Stage4/Stage4_1/VERIFICATION_RU.md	2026-09-18 09:54:43.234627089 +0000
+@@ -0,0 +1,28 @@
++# ToyOS v67 RTD — Stage 4.1: результаты проверки
++
++Дата сборки: 2026-09-18.
++
++## Результаты
++
++| Проверка | Результат |
++|---|---|
++| `check_rtd_stage4_1.sh` | PASS |
++| `kernel.c` 32-bit freestanding compile | PASS |
++| `user_shell.c` 32-bit freestanding compile | PASS |
++| `rtd.c` 32-bit freestanding compile | PASS |
++| `rt_sensor.c` 32-bit freestanding compile | PASS |
++| Компаратор 0/0 | PASS |
++| Компаратор 1/0 | PASS |
++| Компаратор 255/1 | PASS |
++| Компаратор 0/1 | PASS |
++| Компаратор 1/255 | PASS |
++| Компаратор 127/127 | PASS |
++| `rt_pick_ready()` не подключает priority comparator | PASS |
++
++## Регрессионный статус
++
++Изменение ограничено добавлением чистой функции и тестовой инфраструктуры. Алгоритм RT-планирования на Stage 4.1 не изменён.
++
++## Ограничение runtime-проверки
++
++Фактический boot/interactive runtime в этом окружении не выполнялся: `qemu-system-i386` отсутствует.
+
+--- /dev/null	2026-09-18 09:53:29.563890569 +0000
++++ changes/RTD/Stage4/Stage4_1/ARCHIVE_MANIFEST_RU.md	2026-09-18 09:54:43.235344880 +0000
+@@ -0,0 +1,25 @@
++# Manifest — Stage 4.1
++
++База: `ToyOS v67 RTD Stage3 F10 FIX1`.
++
++Изменённые/добавленные исходники:
++
++```text
++src/kernel.c
++src/rt_priority.h
++```
++
++Тест:
++
++```text
++tools/test_rt_priority.c
++check_rtd_stage4_1.sh
++```
++
++Документация:
++
++```text
++changes/RTD/Stage4/Stage4_1/
++```
++
++Политика архивации Markdown: исторические материалы проекта сохраняются в `changes/ProjectHistory/`, а документы RTD — в `changes/RTD/`.

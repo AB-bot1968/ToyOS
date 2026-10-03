@@ -1,0 +1,18 @@
+# FIX60M: SONARDRV must use only PIT MT preemption; successful samples must not enter SYS_MT_YIELD.
+PRINT FIX60M SONAR MT PREEMPTION TEST
+RUN mtstop ALL
+RUN rtstat stop
+RUN rtstat reset
+RUN hwwd disarm
+RUN safemode normal 0
+ASSERT FILE_EXISTS /SONARDRV.EXE
+RUN execmt SONARDRV.EXE
+ASSERT MT_ACTIVE 1
+RUN ps
+RUN mtstat
+RUN ps
+RUN mtstat
+RUN mtstop ALL
+ASSERT MT_ACTIVE 0
+ASSERT PROC_HANDLES 0
+PRINT FIX60M SONAR MT PREEMPTION PASS

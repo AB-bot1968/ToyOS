@@ -1,0 +1,10 @@
+--- a/src/kernel.c
++++ b/src/kernel.c
+@@
+-    f->eax=0;
++    f->eax=2u;
+--- a/src/user_shell.c
++++ b/src/user_shell.c
+@@
+-...if(r!=1)continue;...
++...if(r==2u){put("toy0> ");continue;}if(r!=1)continue;...
