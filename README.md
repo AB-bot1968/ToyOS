@@ -27,8 +27,13 @@
 - UART / Modbus / telemetry / supervisor / watchdog infrastructure;
 - 45 acceptance-тестов из `TST/ACCEPT.TXT`;
 - console-only test reporting без `TST.LOG`.
+- дальнейшая разработка и модернизация с использованием ИИ `TOYOS_DEVELOPMENT_RULES.md`.
 
-Подробная актуальная архитектурная история ведётся в `TOYOS_ARCHITECTURE_VISION.md`.
+`TOYOS_ARCHITECTURE_VISION.md` — долгосрочная архитектура. Мы уже ведём его на русском и продолжаем обновлять при каждом архитектурном изменении.
+`TOYOS_CURRENT_STATE.md` — короткое текущее состояние проекта: какая версия зафиксирована, что проверено, какие hashes являются эталонными, что сейчас разрабатываем.
+`TOYOS_DEVELOPMENT_RULES.md` — постоянные обязательные требования к работе ИИ. Именно сюда стоит записать всё, что нельзя забывать: не ломать рабочий код, тесты не ослаблять ради PASS, всегда создавать TST для новой функциональности, test должен проходить полный ACCEPT, не создавать build/ в релизе, обновлять Architecture Vision, всегда доводить исправление до конца и выдавать полный ZIP и т. д.
+`GitHub AB-bot1968/ToyOS` остаётся внешней зафиксированной историей исходников. Тег v67.11-B-FIX60ZEI не изменяем.
+
 
 ## Сборка
 
@@ -41,18 +46,27 @@
 Из W64DevKit shell:
 
 ```sh
+cd ToyOS
 ./build.sh
 ```
 
 или из `cmd.exe`:
 
 ```bat
+cd ToyOS
 build.bat
 ```
 
 `build.sh` намеренно проверяет target компилятора и прекращает работу, если используется не i386/i686 toolchain.
 
 ## Acceptance-тесты
+
+
+Загрузка ToyOS (Windows + Qemu):
+
+```text
+start.bat
+```
 
 После загрузки ToyOS:
 
