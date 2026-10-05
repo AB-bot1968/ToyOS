@@ -2,6 +2,6 @@
 
 Основной автор и правообладатель стабильного baseline FIX60ZEI:
 
-**AB814** (`AB-bot1968`)
+**Ботнев Александр Валерьевич** (`AB-bot1968`)
 
-Copyright © 2026 AB814. All rights reserved.
+Copyright © 2026 Ботнев Александр Валерьевич. All rights reserved.
